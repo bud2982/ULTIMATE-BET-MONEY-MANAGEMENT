@@ -12,7 +12,9 @@
     "start:win": "node start-production.js",
     "check": "npx --package=typescript tsc --noEmit",
     "type-check": "npx --package=typescript tsc --noEmit --incremental false",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "debug": "node debug-render.js",
+    "start:render": "node debug-render.js && node server.render.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

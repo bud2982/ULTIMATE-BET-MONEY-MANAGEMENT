@@ -23,4 +23,18 @@ fi
 echo "🏗️ Building project..."
 npx vite build
 
+# Verify build output
+echo "🔍 Verifying build output..."
+echo "Contents of dist/:"
+ls -la dist/ || echo "dist/ not found"
+echo "Contents of dist/public/:"
+ls -la dist/public/ || echo "dist/public/ not found"
+
+if [ -f "dist/public/index.html" ]; then
+    echo "✅ Frontend build successful - index.html found"
+else
+    echo "❌ Frontend build failed - index.html not found"
+    exit 1
+fi
+
 echo "✅ Build completed successfully!"

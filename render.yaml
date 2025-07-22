@@ -3,8 +3,8 @@ services:
     name: ultimate-bet-money-management
     env: node
     plan: free
-    buildCommand: npm ci --include=dev --legacy-peer-deps && npx vite build
-    startCommand: node server.render.js
+    buildCommand: npm ci --include=dev --legacy-peer-deps && npx vite build && ls -la dist/
+    startCommand: npm run start:render
     envVars:
       - key: NODE_ENV
         value: production
