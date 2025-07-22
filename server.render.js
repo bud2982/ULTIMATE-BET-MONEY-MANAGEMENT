@@ -156,10 +156,19 @@ app.post('/api/sessions/:id/bets', (req, res) => {
   res.status(201).json(newBet);
 });
 
-// Serve static files from dist if available
-const distPath = path.join(__dirname, 'dist');
-if (fs.existsSync(distPath)) {
-  console.log('Serving static files from:', distPath);
+// Serve static files from dist/public if available
+const distPath = path.join(__dirname, 'dist', 'public');
+const indexPath = path.join(distPath, 'index.html');
+
+console.log('Checking paths:');
+console.log('- __dirname:', __dirname);
+console.log('- distPath:', distPath);
+console.log('- indexPath:', indexPath);
+console.log('- distPath exists:', fs.existsSync(distPath));
+console.log('- indexPath exists:', fs.existsSync(indexPath));
+
+if (fs.existsSync(distPath) && fs.existsSync(indexPath)) {
+  console.log('✅ Serving static files from:', distPath);
   app.use(express.static(distPath));
   
   // SPA fallback for React Router
@@ -167,18 +176,23 @@ if (fs.existsSync(distPath)) {
     if (req.path.startsWith('/api/')) {
       res.status(404).json({ error: 'API endpoint not found' });
     } else {
-      res.sendFile(path.join(distPath, 'index.html'));
+      console.log('Serving SPA for path:', req.path);
+      res.sendFile(indexPath);
     }
   });
 } else {
-  console.log('Dist folder not found, serving API only');
+  console.log('❌ Frontend files not found');
+  console.log('Available files in __dirname:', fs.readdirSync(__dirname));
+  
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
       res.status(404).json({ error: 'API endpoint not found' });
     } else {
       res.json({ 
         error: 'Frontend not built',
-        message: 'This is API-only mode. Frontend needs to be built.',
+        message: 'Frontend files not found. Check build process.',
+        distPath: distPath,
+        indexPath: indexPath,
         available_endpoints: ['/health', '/api/auth/user', '/api/sessions']
       });
     }
