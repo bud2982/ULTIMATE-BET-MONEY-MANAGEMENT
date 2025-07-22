@@ -10,7 +10,8 @@
     "build:clean": "rm -rf node_modules package-lock.json && npm install && npx vite build",
     "start": "cross-env NODE_ENV=production node start-production.js",
     "start:win": "node start-production.js",
-    "check": "tsc",
+    "check": "npx --package=typescript tsc --noEmit",
+    "type-check": "npx --package=typescript tsc --noEmit --incremental false",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
