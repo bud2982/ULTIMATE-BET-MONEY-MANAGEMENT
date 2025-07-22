@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "npx vite build",
-    "build:render": "npx vite build",
+    "build:render": "chmod +x build-render.sh && ./build-render.sh",
+    "build:clean": "rm -rf node_modules package-lock.json && npm install && npx vite build",
     "start": "cross-env NODE_ENV=production node start-production.js",
     "start:win": "node start-production.js",
     "check": "tsc",
