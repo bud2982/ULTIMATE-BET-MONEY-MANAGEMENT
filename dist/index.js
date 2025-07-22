@@ -11,6 +11,7 @@ var __export = (target, all) => {
 };
 
 // server/index.ts
+import "dotenv/config";
 import express2 from "express";
 
 // server/routes.ts
@@ -1033,11 +1034,13 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
   const port = process.env.PORT || 5e3;
+  const host = process.platform === "win32" ? "localhost" : "0.0.0.0";
   server.listen({
     port,
-    host: "0.0.0.0",
-    reusePort: true
+    host,
+    reusePort: process.platform !== "win32"
+    // reusePort non supportato su Windows
   }, () => {
-    log(`serving on port ${port}`);
+    log(`serving on ${host}:${port}`);
   });
 })();

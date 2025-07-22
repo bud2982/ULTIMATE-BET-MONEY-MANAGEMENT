@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -58,11 +59,14 @@ app.use((req, res, next) => {
 
   // Use Railway's dynamic port or fallback to 5000
   const port = process.env.PORT || 5000;
+  // Configurazione host per compatibilità Windows/Linux
+  const host = process.platform === 'win32' ? 'localhost' : '0.0.0.0';
+  
   server.listen({
     port,
-    host: "0.0.0.0",
-    reusePort: true,
+    host,
+    reusePort: process.platform !== 'win32', // reusePort non supportato su Windows
   }, () => {
-    log(`serving on port ${port}`);
+    log(`serving on ${host}:${port}`);
   });
 })();
