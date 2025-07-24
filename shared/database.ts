@@ -1,6 +1,6 @@
 import { pgTable, text, serial, integer, boolean, doublePrecision, timestamp, varchar, jsonb, index } from "drizzle-orm/pg-core";
-import { z } from "zod";
 
+// Session storage table for Replit Auth
 export const authSessions = pgTable(
   "auth_sessions",
   {
@@ -11,6 +11,7 @@ export const authSessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// User storage table for Replit Auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
   email: varchar("email").unique(),
@@ -25,9 +26,7 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
-
+// Betting session schema
 export const sessions = pgTable("betting_sessions", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id),
@@ -44,6 +43,7 @@ export const sessions = pgTable("betting_sessions", {
   strategySettings: text("strategy_settings").notNull(),
 });
 
+// Bet schema
 export const bets = pgTable("bets", {
   id: serial("id").primaryKey(),
   sessionId: integer("session_id").references(() => sessions.id),
@@ -56,32 +56,3 @@ export const bets = pgTable("bets", {
   bankrollAfter: doublePrecision("bankroll_after").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
-
-export const insertBettingSessionSchema = z.object({
-  userId: z.string().optional(),
-  name: z.string().min(1),
-  initialBankroll: z.number().positive(),
-  currentBankroll: z.number().positive(),
-  targetReturn: z.number().positive(),
-  strategy: z.string().min(1),
-  betCount: z.number().int().min(0).default(0),
-  wins: z.number().int().min(0).default(0),
-  losses: z.number().int().min(0).default(0),
-  strategySettings: z.string().min(1),
-});
-
-export const insertBetSchema = z.object({
-  sessionId: z.number().int().positive().optional(),
-  betNumber: z.number().int().positive(),
-  stake: z.number().positive(),
-  odds: z.number().positive(),
-  potentialWin: z.number().positive(),
-  win: z.boolean(),
-  bankrollBefore: z.number().positive(),
-  bankrollAfter: z.number().positive(),
-});
-
-export type InsertSession = z.infer<typeof insertBettingSessionSchema>;
-export type Session = typeof sessions.$inferSelect;
-export type InsertBet = z.infer<typeof insertBetSchema>;
-export type Bet = typeof bets.$inferSelect;

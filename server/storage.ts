@@ -5,21 +5,36 @@ import {
   type InsertSession, 
   type Bet, 
   type InsertBet 
-} from "@shared/schema";
+} from "@shared/types";
+
+// Extended types for better type safety
+export interface ExtendedUser {
+  id: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  subscriptionStatus?: string;
+  subscriptionEndsAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
 export interface IStorage {
   // User operations for Replit Auth
   getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  upsertUser(user: ExtendedUser): Promise<User>;
   updateUserSubscription(id: string, subscription: Partial<User>): Promise<User>;
-  
+
   // Session operations
   getAllSessions(strategy?: string): Promise<Session[]>;
   getSession(id: number): Promise<Session | undefined>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: number, updatedFields: Partial<Session>): Promise<Session | undefined>;
   deleteSession(id: number): Promise<boolean>;
-  
+
   // Bet operations
   getBetsBySessionId(sessionId: number): Promise<Bet[]>;
   createBet(bet: InsertBet): Promise<Bet>;
@@ -27,292 +42,96 @@ export interface IStorage {
   deleteAllBetsForSession(sessionId: number): Promise<boolean>;
 }
 
-import { db } from './db';
-import { eq, desc } from 'drizzle-orm';
-import { users, sessions, bets } from '@shared/schema';
-
-export class DatabaseStorage implements IStorage {
-  // User operations
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user || undefined;
-  }
-
-  async upsertUser(user: UpsertUser): Promise<User> {
-    const [result] = await db
-      .insert(users)
-      .values(user)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          profileImageUrl: user.profileImageUrl,
-          updatedAt: new Date()
-        }
-      })
-      .returning();
-    return result;
-  }
-
-  async updateUserSubscription(id: string, subscription: Partial<User>): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({ ...subscription, updatedAt: new Date() })
-      .where(eq(users.id, id))
-      .returning();
-    return user;
-  }
-
-  // Session operations
-  async getAllSessions(strategy?: string): Promise<Session[]> {
-    if (strategy) {
-      // Se è specificata una strategia, filtra per quella specifica
-      return await db
-        .select()
-        .from(sessions)
-        .where(eq(sessions.strategy, strategy))
-        .orderBy(desc(sessions.createdAt));
-    } else {
-      // Altrimenti restituisci tutte le sessioni
-      return await db
-        .select()
-        .from(sessions)
-        .orderBy(desc(sessions.createdAt));
-    }
-  }
-
-  async getSession(id: number): Promise<Session | undefined> {
-    const [session] = await db
-      .select()
-      .from(sessions)
-      .where(eq(sessions.id, id));
-    return session || undefined;
-  }
-
-  async createSession(insertSession: InsertSession): Promise<Session> {
-    const [session] = await db
-      .insert(sessions)
-      .values({
-        ...insertSession,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      })
-      .returning();
-    return session;
-  }
-
-  async updateSession(id: number, updatedFields: Partial<Session>): Promise<Session | undefined> {
-    const [updatedSession] = await db
-      .update(sessions)
-      .set({
-        ...updatedFields,
-        updatedAt: new Date()
-      })
-      .where(eq(sessions.id, id))
-      .returning();
-    return updatedSession || undefined;
-  }
-
-  async deleteSession(id: number): Promise<boolean> {
-    // Delete all bets associated with this session
-    await db
-      .delete(bets)
-      .where(eq(bets.sessionId, id));
-
-    // Delete the session
-    const result = await db
-      .delete(sessions)
-      .where(eq(sessions.id, id))
-      .returning({ id: sessions.id });
-
-    return result.length > 0;
-  }
-
-  // Bet operations
-  async getBetsBySessionId(sessionId: number): Promise<Bet[]> {
-    return await db
-      .select()
-      .from(bets)
-      .where(eq(bets.sessionId, sessionId))
-      .orderBy(bets.betNumber);
-  }
-
-  async createBet(insertBet: InsertBet): Promise<Bet> {
-    const [bet] = await db
-      .insert(bets)
-      .values({
-        ...insertBet,
-        createdAt: new Date()
-      })
-      .returning();
-    return bet;
-  }
-
-  async updateSessionAfterBet(sessionId: number, bet: Bet): Promise<Session> {
-    const session = await this.getSession(sessionId);
-    if (!session) {
-      throw new Error(`Session with ID ${sessionId} not found`);
-    }
-
-    // Update session bankroll and stats
-    const [updatedSession] = await db
-      .update(sessions)
-      .set({
-        currentBankroll: bet.bankrollAfter,
-        betCount: session.betCount + 1,
-        wins: bet.win ? session.wins + 1 : session.wins,
-        losses: bet.win ? session.losses : session.losses + 1,
-        updatedAt: new Date()
-      })
-      .where(eq(sessions.id, sessionId))
-      .returning();
-
-    return updatedSession;
-  }
-
-  async deleteAllBetsForSession(sessionId: number): Promise<boolean> {
-    // Verifica se la sessione esiste
-    const session = await this.getSession(sessionId);
-    if (!session) {
-      console.log("Sessione non trovata");
-      return false;
-    }
-
-    try {
-      // Elimina tutte le scommesse per questa sessione
-      console.log(`Eliminazione scommesse per sessione ${sessionId}...`);
-      const result = await db
-        .delete(bets)
-        .where(eq(bets.sessionId, sessionId))
-        .returning({ id: bets.id });
-      
-      console.log(`Scommesse eliminate: ${result.length}`);
-
-      // Aggiorna la sessione per ripristinare lo stato iniziale
-      console.log(`Aggiornamento sessione ${sessionId}...`);
-      await db
-        .update(sessions)
-        .set({
-          currentBankroll: session.initialBankroll,
-          betCount: 0,
-          wins: 0,
-          losses: 0,
-          updatedAt: new Date()
-        })
-        .where(eq(sessions.id, sessionId));
-
-      console.log(`Sessione ${sessionId} aggiornata con successo`);
-      return true;
-    } catch (error) {
-      console.error("Errore durante l'eliminazione delle scommesse:", error);
-      return false;
-    }
-  }
-}
-
-// Classe di storage in memoria per gestire problemi temporanei del database
-class MemoryStorage implements IStorage {
-  private users: User[] = [];
-  private sessions: Session[] = [];
-  private bets: Bet[] = [];
-  private nextUserId = 1;
+// In-memory storage for development/testing
+export class InMemoryStorage implements IStorage {
+  private users: Map<string, User> = new Map();
+  private sessions: Map<number, Session> = new Map();
+  private bets: Map<number, Bet[]> = new Map();
   private nextSessionId = 1;
   private nextBetId = 1;
 
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.find(u => u.id === id);
+    return this.users.get(id);
   }
 
-  async upsertUser(user: UpsertUser): Promise<User> {
-    const existingUser = this.users.find(u => u.id === user.id);
-    if (existingUser) {
-      Object.assign(existingUser, user, { updatedAt: new Date() });
-      return existingUser;
-    } else {
-      const newUser: User = {
-        id: user.id!,
-        email: user.email ?? null,
-        firstName: user.firstName ?? null,
-        lastName: user.lastName ?? null,
-        profileImageUrl: user.profileImageUrl ?? null,
-        stripeCustomerId: user.stripeCustomerId ?? null,
-        stripeSubscriptionId: user.stripeSubscriptionId ?? null,
-        subscriptionStatus: user.subscriptionStatus ?? null,
-        subscriptionEndsAt: user.subscriptionEndsAt ?? null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      this.users.push(newUser);
-      return newUser;
-    }
-  }
-
-  async updateUserSubscription(id: string, subscription: Partial<User>): Promise<User> {
-    const user = this.users.find(u => u.id === id);
-    if (!user) throw new Error('User not found');
-    Object.assign(user, subscription, { updatedAt: new Date() });
+  async upsertUser(userData: ExtendedUser): Promise<User> {
+    const user: User = {
+      id: userData.id,
+      email: userData.email || null,
+      firstName: userData.firstName || null,
+      lastName: userData.lastName || null,
+      profileImageUrl: userData.profileImageUrl || null,
+      stripeCustomerId: userData.stripeCustomerId || null,
+      stripeSubscriptionId: userData.stripeSubscriptionId || null,
+      subscriptionStatus: userData.subscriptionStatus || "inactive",
+      subscriptionEndsAt: userData.subscriptionEndsAt || null,
+      createdAt: userData.createdAt || new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(user.id, user);
     return user;
   }
 
-  async getAllSessions(strategy?: string): Promise<Session[]> {
-    let filteredSessions = this.sessions;
-    if (strategy) {
-      filteredSessions = this.sessions.filter(s => s.strategy === strategy);
+  async updateUserSubscription(id: string, subscription: Partial<User>): Promise<User> {
+    const user = this.users.get(id);
+    if (!user) {
+      throw new Error('User not found');
     }
-    return filteredSessions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const updatedUser = { ...user, ...subscription, updatedAt: new Date() };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  async getAllSessions(strategy?: string): Promise<Session[]> {
+    const allSessions = Array.from(this.sessions.values());
+    if (strategy) {
+      return allSessions.filter(s => s.strategy === strategy);
+    }
+    return allSessions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async getSession(id: number): Promise<Session | undefined> {
-    return this.sessions.find(s => s.id === id);
+    return this.sessions.get(id);
   }
 
   async createSession(insertSession: InsertSession): Promise<Session> {
     const session: Session = {
       id: this.nextSessionId++,
-      name: insertSession.name,
       userId: insertSession.userId || null,
+      name: insertSession.name,
       initialBankroll: insertSession.initialBankroll,
       currentBankroll: insertSession.currentBankroll,
       targetReturn: insertSession.targetReturn,
       strategy: insertSession.strategy,
-      strategySettings: insertSession.strategySettings,
-      betCount: 0,
-      wins: 0,
-      losses: 0,
+      betCount: insertSession.betCount || 0,
+      wins: insertSession.wins || 0,
+      losses: insertSession.losses || 0,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      strategySettings: insertSession.strategySettings,
     };
-    this.sessions.push(session);
+    this.sessions.set(session.id, session);
+    this.bets.set(session.id, []);
     return session;
   }
 
   async updateSession(id: number, updatedFields: Partial<Session>): Promise<Session | undefined> {
-    const sessionIndex = this.sessions.findIndex(s => s.id === id);
-    if (sessionIndex === -1) return undefined;
+    const session = this.sessions.get(id);
+    if (!session) return undefined;
     
-    this.sessions[sessionIndex] = {
-      ...this.sessions[sessionIndex],
-      ...updatedFields,
-      updatedAt: new Date()
-    };
-    return this.sessions[sessionIndex];
+    const updated = { ...session, ...updatedFields, updatedAt: new Date() };
+    this.sessions.set(id, updated);
+    return updated;
   }
 
   async deleteSession(id: number): Promise<boolean> {
-    const sessionIndex = this.sessions.findIndex(s => s.id === id);
-    if (sessionIndex === -1) return false;
-    
-    this.sessions.splice(sessionIndex, 1);
-    this.bets = this.bets.filter(b => b.sessionId !== id);
-    return true;
+    const deleted = this.sessions.delete(id);
+    this.bets.delete(id);
+    return deleted;
   }
 
   async getBetsBySessionId(sessionId: number): Promise<Bet[]> {
-    return this.bets
-      .filter(b => b.sessionId === sessionId)
-      .sort((a, b) => a.betNumber - b.betNumber);
+    return this.bets.get(sessionId) || [];
   }
 
   async createBet(insertBet: InsertBet): Promise<Bet> {
@@ -326,176 +145,53 @@ class MemoryStorage implements IStorage {
       win: insertBet.win,
       bankrollBefore: insertBet.bankrollBefore,
       bankrollAfter: insertBet.bankrollAfter,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
-    this.bets.push(bet);
+    
+    const sessionBets = this.bets.get(insertBet.sessionId!) || [];
+    sessionBets.push(bet);
+    this.bets.set(insertBet.sessionId!, sessionBets);
+    
     return bet;
   }
 
   async updateSessionAfterBet(sessionId: number, bet: Bet): Promise<Session> {
-    const session = this.sessions.find(s => s.id === sessionId);
-    if (!session) throw new Error('Session not found');
-
-    session.betCount = session.betCount + 1;
-    session.currentBankroll = bet.bankrollAfter;
-    if (bet.win) {
-      session.wins = session.wins + 1;
-    } else {
-      session.losses = session.losses + 1;
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
     }
-    session.updatedAt = new Date();
 
-    return session;
-  }
-
-  async deleteAllBetsForSession(sessionId: number): Promise<boolean> {
-    const initialLength = this.bets.length;
-    this.bets = this.bets.filter(b => b.sessionId !== sessionId);
-    return this.bets.length < initialLength;
-  }
-}
-
-// Usa storage in memoria per evitare problemi di database
-// Implementazione in memoria per ora
-class AuthMemoryStorage implements IStorage {
-  private users: User[] = [];
-  private sessions: Session[] = [];
-  private bets: Bet[] = [];
-  private nextSessionId = 1;
-  private nextBetId = 1;
-
-  // User operations for Replit Auth
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.find(u => u.id === id);
-  }
-
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const existingIndex = this.users.findIndex(u => u.id === userData.id);
-    const user: User = {
-      id: userData.id!,
-      email: userData.email || null,
-      firstName: userData.firstName || null,
-      lastName: userData.lastName || null,
-      profileImageUrl: userData.profileImageUrl || null,
-      stripeCustomerId: userData.stripeCustomerId || null,
-      stripeSubscriptionId: userData.stripeSubscriptionId || null,
-      subscriptionStatus: userData.subscriptionStatus || "inactive",
-      subscriptionEndsAt: userData.subscriptionEndsAt || null,
-      createdAt: userData.createdAt || new Date(),
-      updatedAt: new Date(),
-    };
-
-    if (existingIndex >= 0) {
-      this.users[existingIndex] = user;
-    } else {
-      this.users.push(user);
-    }
-    return user;
-  }
-
-  async updateUserSubscription(id: string, subscription: Partial<User>): Promise<User> {
-    const userIndex = this.users.findIndex(u => u.id === id);
-    if (userIndex === -1) {
-      throw new Error("User not found");
-    }
-    
-    this.users[userIndex] = { ...this.users[userIndex], ...subscription, updatedAt: new Date() };
-    return this.users[userIndex];
-  }
-
-  // Session operations
-  async getAllSessions(strategy?: string): Promise<Session[]> {
-    if (strategy) {
-      return this.sessions.filter(s => s.strategy === strategy);
-    }
-    return [...this.sessions];
-  }
-
-  async getSession(id: number): Promise<Session | undefined> {
-    return this.sessions.find(s => s.id === id);
-  }
-
-  async createSession(insertSession: InsertSession): Promise<Session> {
-    const session: Session = {
-      id: this.nextSessionId++,
-      userId: insertSession.userId ?? null,
-      name: insertSession.name,
-      initialBankroll: insertSession.initialBankroll,
-      currentBankroll: insertSession.currentBankroll,
-      targetReturn: insertSession.targetReturn,
-      strategy: insertSession.strategy,
-      betCount: insertSession.betCount || 0,
-      wins: insertSession.wins || 0,
-      losses: insertSession.losses || 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      strategySettings: insertSession.strategySettings,
-    };
-    this.sessions.push(session);
-    return session;
-  }
-
-  async updateSession(id: number, updatedFields: Partial<Session>): Promise<Session | undefined> {
-    const sessionIndex = this.sessions.findIndex(s => s.id === id);
-    if (sessionIndex === -1) return undefined;
-    
-    this.sessions[sessionIndex] = { ...this.sessions[sessionIndex], ...updatedFields, updatedAt: new Date() };
-    return this.sessions[sessionIndex];
-  }
-
-  async deleteSession(id: number): Promise<boolean> {
-    const sessionIndex = this.sessions.findIndex(s => s.id === id);
-    if (sessionIndex === -1) return false;
-    
-    this.sessions.splice(sessionIndex, 1);
-    await this.deleteAllBetsForSession(id);
-    return true;
-  }
-
-  // Bet operations
-  async getBetsBySessionId(sessionId: number): Promise<Bet[]> {
-    return this.bets.filter(b => b.sessionId === sessionId);
-  }
-
-  async createBet(insertBet: InsertBet): Promise<Bet> {
-    const bet: Bet = {
-      id: this.nextBetId++,
-      sessionId: insertBet.sessionId ?? null,
-      betNumber: insertBet.betNumber,
-      stake: insertBet.stake,
-      odds: insertBet.odds,
-      potentialWin: insertBet.potentialWin,
-      win: insertBet.win,
-      bankrollBefore: insertBet.bankrollBefore,
-      bankrollAfter: insertBet.bankrollAfter,
-      createdAt: new Date(),
-    };
-    this.bets.push(bet);
-    return bet;
-  }
-
-  async updateSessionAfterBet(sessionId: number, bet: Bet): Promise<Session> {
-    const session = await this.getSession(sessionId);
-    if (!session) throw new Error("Session not found");
-
-    const updatedSession = {
+    const updated: Session = {
       ...session,
       currentBankroll: bet.bankrollAfter,
       betCount: session.betCount + 1,
       wins: bet.win ? session.wins + 1 : session.wins,
       losses: bet.win ? session.losses : session.losses + 1,
-      updatedAt: new Date(),
+      updatedAt: new Date()
     };
-
-    await this.updateSession(sessionId, updatedSession);
-    return updatedSession;
+    
+    this.sessions.set(sessionId, updated);
+    return updated;
   }
 
   async deleteAllBetsForSession(sessionId: number): Promise<boolean> {
-    const beforeLength = this.bets.length;
-    this.bets = this.bets.filter(b => b.sessionId !== sessionId);
-    return this.bets.length < beforeLength;
+    this.bets.set(sessionId, []);
+    
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      const updated = {
+        ...session,
+        betCount: 0,
+        wins: 0,
+        losses: 0,
+        updatedAt: new Date()
+      };
+      this.sessions.set(sessionId, updated);
+    }
+    
+    return true;
   }
 }
 
-export const storage = new AuthMemoryStorage();
+// Export storage instance - using InMemoryStorage for now to avoid DB issues
+export const storage = new InMemoryStorage();
