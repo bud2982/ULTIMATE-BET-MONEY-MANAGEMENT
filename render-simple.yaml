@@ -1,0 +1,11 @@
+services:
+- type: web
+  name: ultimate-bet-money-management
+  env: node
+  plan: free
+  buildCommand: npm install && npm run build
+  startCommand: node server.render.js
+  envVars:
+  - key: NODE_ENV
+    value: production
+  healthCheckPath: /health
