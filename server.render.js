@@ -156,18 +156,33 @@ app.post('/api/sessions/:id/bets', (req, res) => {
   res.status(201).json(newBet);
 });
 
-// Serve static files from dist/public if available
-const distPath = path.join(__dirname, 'dist', 'public');
-const indexPath = path.join(distPath, 'index.html');
+// Try multiple possible paths for static files
+const possiblePaths = [
+  path.join(__dirname, 'dist', 'public'),
+  path.join(__dirname, 'public'),
+  path.join(__dirname, 'build'),
+  path.join(__dirname, 'client', 'dist')
+];
+
+let distPath = null;
+let indexPath = null;
 
 console.log('Checking paths:');
 console.log('- __dirname:', __dirname);
-console.log('- distPath:', distPath);
-console.log('- indexPath:', indexPath);
-console.log('- distPath exists:', fs.existsSync(distPath));
-console.log('- indexPath exists:', fs.existsSync(indexPath));
 
-if (fs.existsSync(distPath) && fs.existsSync(indexPath)) {
+for (const testPath of possiblePaths) {
+  const testIndex = path.join(testPath, 'index.html');
+  console.log(`- Testing: ${testPath} (exists: ${fs.existsSync(testPath)}, index: ${fs.existsSync(testIndex)})`);
+  
+  if (fs.existsSync(testPath) && fs.existsSync(testIndex)) {
+    distPath = testPath;
+    indexPath = testIndex;
+    console.log(`✅ Found static files at: ${distPath}`);
+    break;
+  }
+}
+
+if (distPath && indexPath) {
   console.log('✅ Serving static files from:', distPath);
   app.use(express.static(distPath));
   
@@ -183,6 +198,7 @@ if (fs.existsSync(distPath) && fs.existsSync(indexPath)) {
 } else {
   console.log('❌ Frontend files not found');
   console.log('Available files in __dirname:', fs.readdirSync(__dirname));
+  console.log('Checked paths:', possiblePaths);
   
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
@@ -191,8 +207,7 @@ if (fs.existsSync(distPath) && fs.existsSync(indexPath)) {
       res.json({ 
         error: 'Frontend not built',
         message: 'Frontend files not found. Check build process.',
-        distPath: distPath,
-        indexPath: indexPath,
+        checkedPaths: possiblePaths,
         available_endpoints: ['/health', '/api/auth/user', '/api/sessions']
       });
     }
