@@ -233,7 +233,8 @@ export function useBetting() {
           profitfall: { 
             perditaAccumulata: 0, 
             stepCorrente: 1, 
-            isSequenceActive: false 
+            isSequenceActive: false,
+            stakePrecedente: 0
           }
         });
         break;
@@ -308,7 +309,8 @@ export function useBetting() {
         newState.profitfall = { 
           perditaAccumulata: 0, 
           stepCorrente: 1, 
-          isSequenceActive: false 
+          isSequenceActive: false,
+          stakePrecedente: 0
         };
       }
       
@@ -317,11 +319,11 @@ export function useBetting() {
         newState.profitfall.perditaAccumulata += currentStake;
         newState.profitfall.stepCorrente += 1;
         newState.profitfall.isSequenceActive = true;
+        newState.profitfall.stakePrecedente = currentStake;
       } else {
-        // In caso di vincita, resetta la sequenza
-        newState.profitfall.perditaAccumulata = 0;
-        newState.profitfall.stepCorrente = 1;
-        newState.profitfall.isSequenceActive = false;
+        // In caso di vincita, la gestione è delegata alla logica del sistema ibrido
+        // che decide se resettare completamente o continuare con le perdite residue
+        newState.profitfall.stakePrecedente = currentStake;
       }
       
       setBettingState(newState);

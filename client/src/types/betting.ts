@@ -41,10 +41,17 @@ export interface BettingStrategySettings {
   stopLoss?: number; // Stop loss (es. -6 step D'Alembert)
   targetProfit?: number; // Target di uscita
   
-  // Parametri Profit Fall (nuovo sistema D'Alembert)
+  // Parametri Profit Fall (Sistema Ibrido Bilanciato)
   stakeIniziale?: number; // Puntata iniziale scelta manualmente
   margineProfitto?: number; // Percentuale di guadagno desiderato (es. 10%)
   profitFallStopLoss?: number; // Massimo importo totale di perdita accettabile
+  
+  // Parametri Sistema Ibrido
+  fattoreRecupero?: number; // Fattore di recupero parziale (es. 0.65 = 65%)
+  aumentoMassimoStep?: number; // Aumento massimo per step (€)
+  capMassimoAssoluto?: number; // Cap massimo assoluto (€)
+  usaQuotaReale?: boolean; // Se usare quote reali o fisse
+  quotaRiferimento?: number; // Quota fissa per calcoli (default 2.0)
 }
 
 export interface BetData {
@@ -78,11 +85,12 @@ export interface SessionData {
   strategySettings: string; // JSON string of BettingStrategySettings
 }
 
-// Interfaccia per lo stato della strategia PROFIT FALL (nuovo sistema D'Alembert)
+// Interfaccia per lo stato della strategia PROFIT FALL (Sistema Ibrido Bilanciato)
 export interface ProfitFallState {
   perditaAccumulata: number; // Somma di tutte le puntate precedenti non vinte
   stepCorrente: number; // Step corrente della sequenza
   isSequenceActive: boolean; // Se la sequenza è attiva
+  stakePrecedente?: number; // Stake della puntata precedente (per calcoli graduali)
 }
 
 export interface DalembertState {

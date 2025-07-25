@@ -94,72 +94,138 @@ export function calculateNextStake(
         updatedState.profitfall = { 
           perditaAccumulata: 0, 
           stepCorrente: 1, 
-          isSequenceActive: false 
+          isSequenceActive: false,
+          stakePrecedente: 0
         };
       }
       
-      // Parametri dalla configurazione
+      // Parametri dalla configurazione - Sistema Ibrido Bilanciato
       const stakeIniziale = settings.stakeIniziale || 10; // Default 10€
       const margineProfitto = (settings.margineProfitto || 10) / 100; // Default 10% convertito in decimale
       const profitFallStopLoss = settings.profitFallStopLoss || 100; // Default 100€
       const quotaStepCorrente = currentOdds || 2.0; // Quota dinamica dello step corrente
+      
+      // Parametri Sistema Ibrido
+      const fattoreRecupero = settings.fattoreRecupero || 0.65; // 65% recupero parziale (bilanciato)
+      const aumentoMassimoStep = settings.aumentoMassimoStep || (stakeIniziale * 1.5); // 1.5x stake iniziale
+      const capMassimoAssoluto = settings.capMassimoAssoluto || (stakeIniziale * 10); // 10x stake iniziale
+      const usaQuotaReale = settings.usaQuotaReale !== false; // Default true (quote variabili)
+      const quotaRiferimento = settings.quotaRiferimento || 2.0; // Quota fissa per calcoli
       
       // Controllo Stop Loss
       if (updatedState.profitfall!.perditaAccumulata >= profitFallStopLoss) {
         // Stop Loss raggiunto - interrompe la sequenza
         updatedState.profitfall!.isSequenceActive = false;
         stake = 0;
-        console.log("PROFIT FALL - Stop Loss raggiunto:", {
+        console.log("PROFIT FALL IBRIDO - Stop Loss raggiunto:", {
           perditaAccumulata: updatedState.profitfall!.perditaAccumulata,
           profitFallStopLoss
         });
         break;
       }
       
-      // Se la scommessa precedente è stata vinta, resettiamo la sequenza
+      // GESTIONE VINCITA: Continuazione Intelligente
       if (previousWin === true) {
-        updatedState.profitfall!.perditaAccumulata = 0;
-        updatedState.profitfall!.stepCorrente = 1;
-        updatedState.profitfall!.isSequenceActive = false;
-        stake = stakeIniziale;
+        // Calcola quanto abbiamo recuperato con la vincita precedente
+        const stakePrecedente = updatedState.profitfall!.stakePrecedente || 0;
+        const vincitaNetta = stakePrecedente * (quotaStepCorrente - 1);
+        
+        // Aggiorna le perdite residue
+        const nuovePerditaAccumulata = Math.max(0, updatedState.profitfall!.perditaAccumulata - vincitaNetta);
+        
+        if (nuovePerditaAccumulata <= 0) {
+          // OBIETTIVO RAGGIUNTO: Recupero completo + profit
+          console.log("🎉 PROFIT FALL IBRIDO - OBIETTIVO RAGGIUNTO! Profit realizzato!");
+          updatedState.profitfall!.perditaAccumulata = 0;
+          updatedState.profitfall!.stepCorrente = 1;
+          updatedState.profitfall!.isSequenceActive = false;
+          updatedState.profitfall!.stakePrecedente = 0;
+          stake = stakeIniziale; // Reset alla puntata iniziale
+        } else {
+          // CONTINUAZIONE INTELLIGENTE: Continua con le perdite residue
+          console.log("📈 PROFIT FALL IBRIDO - Continuazione intelligente con perdite residue:", nuovePerditaAccumulata);
+          updatedState.profitfall!.perditaAccumulata = nuovePerditaAccumulata;
+          updatedState.profitfall!.stepCorrente++; // Continua la sequenza
+          updatedState.profitfall!.isSequenceActive = true;
+          
+          // Calcola la prossima puntata per le perdite residue
+          const perditeRecuperabili = nuovePerditaAccumulata * fattoreRecupero;
+          const guadagnoDesiderato = stakeIniziale * margineProfitto;
+          const obiettivo = perditeRecuperabili + guadagnoDesiderato;
+          
+          // Scegli quota per calcolo
+          const quotaCalcolo = usaQuotaReale ? quotaStepCorrente : quotaRiferimento;
+          
+          // Calcola puntata base
+          const puntataBase = obiettivo / (quotaCalcolo - 1);
+          
+          // Applica limite graduale
+          const puntataConGradini = Math.min(puntataBase, stakePrecedente + aumentoMassimoStep);
+          
+          // Applica cap assoluto
+          stake = Math.min(puntataConGradini, capMassimoAssoluto);
+        }
       }
       // Se è il primo step (SEMPRE stake iniziale fisso)
       else if (updatedState.profitfall!.stepCorrente === 1) {
         stake = stakeIniziale;
         updatedState.profitfall!.isSequenceActive = true;
+        updatedState.profitfall!.stakePrecedente = stakeIniziale;
       }
-      // Per step >= 2: Formula corretta per recuperare TUTTE le perdite + margine
+      // Per step >= 2: Formula Ibrida con Recupero Parziale + Controlli di Sicurezza
       else {
-        // FORMULA CORRETTA: Recuperare TUTTE le perdite accumulate + guadagno desiderato
+        // STEP 1: Calcola obiettivo con recupero parziale
+        const perditeRecuperabili = updatedState.profitfall!.perditaAccumulata * fattoreRecupero;
         const guadagnoDesiderato = stakeIniziale * margineProfitto;
-        const obiettivoTotale = updatedState.profitfall!.perditaAccumulata + guadagnoDesiderato;
-        const denominatore = quotaStepCorrente - 1;
+        const obiettivo = perditeRecuperabili + guadagnoDesiderato;
         
-        if (denominatore <= 0) {
-          console.error("PROFIT FALL - Quota non valida:", quotaStepCorrente);
+        // STEP 2: Scegli quota per calcolo
+        const quotaCalcolo = usaQuotaReale ? quotaStepCorrente : quotaRiferimento;
+        
+        if (quotaCalcolo <= 1) {
+          console.error("PROFIT FALL IBRIDO - Quota non valida:", quotaCalcolo);
           stake = stakeIniziale; // Fallback alla puntata iniziale
         } else {
-          // Formula corretta: puntata = (perdite totali + guadagno desiderato) / (quota - 1)
-          stake = obiettivoTotale / denominatore;
+          // STEP 3: Calcola puntata base
+          const puntataBase = obiettivo / (quotaCalcolo - 1);
+          
+          // STEP 4: Applica limite graduale
+          const stakePrecedente = updatedState.profitfall!.stakePrecedente || stakeIniziale;
+          const puntataConGradini = Math.min(puntataBase, stakePrecedente + aumentoMassimoStep);
+          
+          // STEP 5: Applica cap assoluto
+          stake = Math.min(puntataConGradini, capMassimoAssoluto);
         }
+        
+        // Aggiorna lo stake precedente per il prossimo calcolo
+        updatedState.profitfall!.stakePrecedente = stake;
       }
       
       // Arrotondiamo per avere al massimo 2 decimali
       stake = Math.round(stake * 100) / 100;
       
-      console.log("PROFIT FALL calculation (formula corretta):", {
+      console.log("PROFIT FALL IBRIDO calculation:", {
+        sistema: "Ibrido Bilanciato con Quote Variabili e Continuazione Intelligente",
         stakeIniziale,
         margineProfitto: margineProfitto * 100 + '%',
+        fattoreRecupero: fattoreRecupero * 100 + '%',
+        aumentoMassimoStep,
+        capMassimoAssoluto,
+        usaQuotaReale,
+        quotaRiferimento,
         quotaStepCorrente,
         profitFallStopLoss,
         perditaAccumulata: updatedState.profitfall!.perditaAccumulata,
         stepCorrente: updatedState.profitfall!.stepCorrente,
+        stakePrecedente: updatedState.profitfall!.stakePrecedente,
         isSequenceActive: updatedState.profitfall!.isSequenceActive,
         previousWin,
+        perditeRecuperabili: updatedState.profitfall!.stepCorrente > 1 ? 
+          (updatedState.profitfall!.perditaAccumulata * fattoreRecupero) : null,
         guadagnoDesiderato: updatedState.profitfall!.stepCorrente > 1 ? 
           (stakeIniziale * margineProfitto) : null,
-        obiettivoTotale: updatedState.profitfall!.stepCorrente > 1 ? 
-          updatedState.profitfall!.perditaAccumulata + (stakeIniziale * margineProfitto) : null,
+        obiettivo: updatedState.profitfall!.stepCorrente > 1 ? 
+          (updatedState.profitfall!.perditaAccumulata * fattoreRecupero + stakeIniziale * margineProfitto) : null,
         finalStake: stake
       });
       break;

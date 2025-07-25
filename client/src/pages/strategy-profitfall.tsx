@@ -31,6 +31,14 @@ export default function StrategyProfitFall() {
   const [targetReturn, setTargetReturn] = useState(30);
   const [showRiskWarning, setShowRiskWarning] = useState(false);
   
+  // Nuovi parametri Sistema Ibrido Bilanciato
+  const [fattoreRecupero, setFattoreRecupero] = useState(65); // 65% (bilanciato)
+  const [aumentoMassimoStep, setAumentoMassimoStep] = useState(15); // €15 (1.5x stake iniziale default)
+  const [capMassimoAssoluto, setCapMassimoAssoluto] = useState(100); // €100 (10x stake iniziale default)
+  const [usaQuotaReale, setUsaQuotaReale] = useState(true); // Quote variabili
+  const [quotaRiferimento, setQuotaRiferimento] = useState(2.0); // Quota fissa per calcoli
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  
   // Verifica se il prossimo importo della scommessa potrebbe portare il bankroll in negativo
   useEffect(() => {
     if (!betting.currentSession) return;
@@ -68,6 +76,13 @@ export default function StrategyProfitFall() {
         setProfitFallStopLoss(settings.profitFallStopLoss || 100);
         setTargetReturn(betting.currentSession.targetReturn);
         setSessionName(betting.currentSession.name);
+        
+        // Parametri Sistema Ibrido
+        setFattoreRecupero(settings.fattoreRecupero ? settings.fattoreRecupero * 100 : 65);
+        setAumentoMassimoStep(settings.aumentoMassimoStep || (settings.stakeIniziale || 10) * 1.5);
+        setCapMassimoAssoluto(settings.capMassimoAssoluto || (settings.stakeIniziale || 10) * 10);
+        setUsaQuotaReale(settings.usaQuotaReale !== false);
+        setQuotaRiferimento(settings.quotaRiferimento || 2.0);
       } catch (error) {
         console.error("Errore nel parsing delle impostazioni della strategia:", error);
       }
@@ -80,8 +95,25 @@ export default function StrategyProfitFall() {
       setTargetReturn(30);
       setSessionName(`Sessione PROFIT FALL ${new Date().toLocaleDateString()}`);
       setShowRiskWarning(false);
+      
+      // Reset parametri Sistema Ibrido ai valori di default
+      setFattoreRecupero(65);
+      setAumentoMassimoStep(15);
+      setCapMassimoAssoluto(100);
+      setUsaQuotaReale(true);
+      setQuotaRiferimento(2.0);
+      setShowAdvancedSettings(false);
     }
   }, [betting.currentSession]);
+  
+  // Aggiorna automaticamente i valori di default del sistema ibrido quando cambia lo stake iniziale
+  useEffect(() => {
+    if (!betting.currentSession) {
+      // Solo se non c'è una sessione attiva, aggiorna i valori di default
+      setAumentoMassimoStep(stakeIniziale * 1.5);
+      setCapMassimoAssoluto(stakeIniziale * 10);
+    }
+  }, [stakeIniziale, betting.currentSession]);
   
   const handleStartNewSession = () => {
     // Validazione nome sessione
@@ -149,11 +181,18 @@ export default function StrategyProfitFall() {
       return;
     }
     
-    // Crea le impostazioni della strategia PROFIT FALL (nuovo sistema D'Alembert)
+    // Crea le impostazioni della strategia PROFIT FALL (Sistema Ibrido Bilanciato)
     const strategySettings = {
       stakeIniziale: validStakeIniziale,
       margineProfitto: validMargineProfitto,
-      profitFallStopLoss: validProfitFallStopLoss
+      profitFallStopLoss: validProfitFallStopLoss,
+      
+      // Parametri Sistema Ibrido
+      fattoreRecupero: fattoreRecupero / 100, // Converte da percentuale a decimale
+      aumentoMassimoStep: aumentoMassimoStep,
+      capMassimoAssoluto: capMassimoAssoluto,
+      usaQuotaReale: usaQuotaReale,
+      quotaRiferimento: quotaRiferimento
     };
     
     // Inizia una nuova sessione con tutti i campi richiesti
@@ -214,6 +253,14 @@ export default function StrategyProfitFall() {
         setSessionName(`Sessione PROFIT FALL ${new Date().toLocaleDateString()}`);
         setTargetReturn(30);
         setShowRiskWarning(false);
+        
+        // Reset parametri Sistema Ibrido
+        setFattoreRecupero(65);
+        setAumentoMassimoStep(15);
+        setCapMassimoAssoluto(100);
+        setUsaQuotaReale(true);
+        setQuotaRiferimento(2.0);
+        setShowAdvancedSettings(false);
         
         toast({
           title: "Sessione resettata",
@@ -313,8 +360,11 @@ export default function StrategyProfitFall() {
         </div>
         
         <p className="mt-2 text-gray-600">
-          La strategia PROFIT FALL utilizza una progressione a cascata con un incremento percentuale fisso.
-          Ogni puntata aumenta in base alle puntate precedenti, seguendo una progressione incrementale.
+          La strategia PROFIT FALL utilizza un <strong>Sistema Ibrido Bilanciato</strong> che combina:
+          <br />• <strong>Recupero Parziale</strong> (65% delle perdite per volta)
+          <br />• <strong>Quote Variabili</strong> (si adatta alle quote reali)
+          <br />• <strong>Controlli di Sicurezza</strong> (limiti graduali e cap assoluti)
+          <br />• <strong>Continuazione Intelligente</strong> (recupera tutto + profit)
         </p>
       </header>
       
@@ -682,9 +732,134 @@ export default function StrategyProfitFall() {
                     </p>
                   </div>
                   
+                  {/* Sezione Parametri Avanzati Sistema Ibrido */}
+                  <div className="border-t pt-4 mt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                      className="w-full mb-4"
+                    >
+                      {showAdvancedSettings ? "🔽 Nascondi" : "🔧 Mostra"} Parametri Avanzati Sistema Ibrido
+                    </Button>
+                    
+                    {showAdvancedSettings && (
+                      <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <div className="text-sm text-blue-800 font-medium mb-3">
+                          ⚙️ <strong>Sistema Ibrido Bilanciato</strong> - Configurazione Avanzata
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="fattoreRecupero">Fattore Recupero</Label>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="fattoreRecupero"
+                                type="number"
+                                min="30"
+                                max="100"
+                                step="5"
+                                value={fattoreRecupero}
+                                onChange={(e) => setFattoreRecupero(parseFloat(e.target.value))}
+                                className="mt-1"
+                              />
+                              <span className="text-gray-500">%</span>
+                            </div>
+                            <p className="text-sm text-blue-600 mt-1">
+                              Recupera il {fattoreRecupero}% delle perdite per volta (65% = bilanciato)
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="aumentoMassimoStep">Aumento Max per Step</Label>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="aumentoMassimoStep"
+                                type="number"
+                                min="5"
+                                max="100"
+                                step="5"
+                                value={aumentoMassimoStep}
+                                onChange={(e) => setAumentoMassimoStep(parseFloat(e.target.value))}
+                                className="mt-1"
+                              />
+                              <span className="text-gray-500">€</span>
+                            </div>
+                            <p className="text-sm text-blue-600 mt-1">
+                              Limite graduale: max +{formatCurrency(aumentoMassimoStep)} per step
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="capMassimoAssoluto">Cap Massimo Assoluto</Label>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="capMassimoAssoluto"
+                                type="number"
+                                min="50"
+                                max="1000"
+                                step="10"
+                                value={capMassimoAssoluto}
+                                onChange={(e) => setCapMassimoAssoluto(parseFloat(e.target.value))}
+                                className="mt-1"
+                              />
+                              <span className="text-gray-500">€</span>
+                            </div>
+                            <p className="text-sm text-blue-600 mt-1">
+                              Puntata massima assoluta: {formatCurrency(capMassimoAssoluto)}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="quotaRiferimento">Quota di Riferimento</Label>
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                id="quotaRiferimento"
+                                type="number"
+                                min="1.5"
+                                max="5.0"
+                                step="0.1"
+                                value={quotaRiferimento}
+                                onChange={(e) => setQuotaRiferimento(parseFloat(e.target.value))}
+                                className="mt-1"
+                                disabled={usaQuotaReale}
+                              />
+                            </div>
+                            <p className="text-sm text-blue-600 mt-1">
+                              Quota fissa per calcoli (solo se quote fisse attive)
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2 pt-2">
+                          <input
+                            type="checkbox"
+                            id="usaQuotaReale"
+                            checked={usaQuotaReale}
+                            onChange={(e) => setUsaQuotaReale(e.target.checked)}
+                            className="rounded"
+                          />
+                          <Label htmlFor="usaQuotaReale" className="text-sm">
+                            🎯 <strong>Quote Variabili</strong> - Adatta le puntate alle quote reali
+                          </Label>
+                        </div>
+                        
+                        <div className="bg-white p-3 rounded border border-blue-300">
+                          <div className="text-xs text-blue-700">
+                            <strong>💡 Configurazione Attuale:</strong>
+                            <br />• Recupero: {fattoreRecupero}% delle perdite
+                            <br />• Limite graduale: +{formatCurrency(aumentoMassimoStep)} per step
+                            <br />• Cap assoluto: {formatCurrency(capMassimoAssoluto)}
+                            <br />• Quote: {usaQuotaReale ? "Variabili (si adatta alle quote reali)" : `Fisse (sempre ${quotaRiferimento})`}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
                   <Button 
                     onClick={handleStartNewSession} 
-                    className="w-full mt-2 bg-primary text-white"
+                    className="w-full mt-4 bg-primary text-white"
                     disabled={betting.isCreatingSession}
                   >
                     {betting.isCreatingSession ? "Creazione in corso..." : "Crea Nuova Sessione"}
