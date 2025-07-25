@@ -21,19 +21,13 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { mlPredictor, type MLPrediction } from "@/lib/ml-predictor";
 import { bettingLogger } from "@/lib/betting-logger";
-import BeatDelaySessionsManager from "@/components/beat-delay-sessions-manager";
-import { useBeatDelaySessions, type BeatDelaySession, type CreateBeatDelayBetData } from "@/hooks/use-beat-delay-sessions";
+// Rimuoviamo il sistema personalizzato per usare quello esistente
 
 export default function StrategyBeatDelay() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const betting = useBetting();
-  const beatDelaySessions = useBeatDelaySessions();
   const [confirmingReset, setConfirmingReset] = useState(false);
-  
-  // Stato per gestione sessioni
-  const [showSessionsManager, setShowSessionsManager] = useState(false);
-  const [currentBeatDelaySession, setCurrentBeatDelaySession] = useState<BeatDelaySession | null>(null);
   
   // Form state
   const [initialBankroll, setInitialBankroll] = useState(1000);
@@ -93,74 +87,8 @@ export default function StrategyBeatDelay() {
   const [evThreshold, setEvThreshold] = useState(0.08);
   const [recoveryAlertThreshold, setRecoveryAlertThreshold] = useState(0.10);
 
-  // Funzioni per gestione sessioni Beat the Delay
-  const handleSessionLoad = (session: BeatDelaySession) => {
-    setCurrentBeatDelaySession(session);
-    setSessionName(session.sessionName);
-    setInitialBankroll(session.initialBankroll);
-    setBaseStake(session.baseStake);
-    setTargetReturn(session.targetReturn);
-    setStopLoss(session.stopLoss);
-    
-    toast({
-      title: "Sessione caricata",
-      description: `Sessione "${session.sessionName}" caricata con successo`,
-    });
-  };
-
-  const getCurrentSessionData = () => {
-    if (!betting.currentSession) return null;
-    
-    return {
-      sessionName,
-      initialBankroll,
-      baseStake,
-      targetReturn,
-      stopLoss,
-      finalBankroll: betting.currentSession.currentBankroll,
-      totalBets: betting.currentSession.betCount,
-      totalWins: betting.currentSession.wins,
-      totalLosses: betting.currentSession.losses,
-      profitLoss: betting.currentSession.currentBankroll - initialBankroll,
-    };
-  };
-
-  const placeBeatDelayBet = (win: boolean) => {
-    // Prima salva nel sistema tradizionale
-    betting.placeBet(win);
-    
-    // Poi salva nel sistema Beat the Delay se abbiamo una sessione attiva
-    if (currentBeatDelaySession && betting.currentSession) {
-      const betData: CreateBeatDelayBetData = {
-        betNumber: betting.currentSession.betCount + 1,
-        stake: betting.nextStake,
-        odds: currentOdds,
-        potentialWin: betting.potentialWin,
-        win,
-        bankrollBefore: betting.currentSession.currentBankroll,
-        bankrollAfter: win ? 
-          betting.currentSession.currentBankroll + (betting.potentialWin - betting.nextStake) :
-          betting.currentSession.currentBankroll - betting.nextStake,
-        currentSign,
-        currentDelay,
-        historicalFrequency,
-        avgDelay,
-        maxDelay,
-        captureRate,
-        estimatedProbability,
-        expectedValue,
-        shouldPlay,
-        anomalyIndex,
-        recoveryRate,
-        mlProbability: mlPrediction.probability,
-        mlConfidence: mlPrediction.confidence,
-        combinedProbability,
-        combinedEV,
-      };
-
-      beatDelaySessions.addBet(currentBeatDelaySession.id, betData);
-    }
-  };
+  // Filtriamo le sessioni Beat the Delay dal sistema esistente
+  const beatDelaySessions = betting.sessions?.filter(session => session.strategy === 'beat-delay') || [];
 
   // Calculate automatic capture rate based on historical performance
   const calculateAutoCaptureRate = () => {
@@ -1046,10 +974,105 @@ export default function StrategyBeatDelay() {
                     </TabsContent>
                     
                     <TabsContent value="sessions" className="space-y-4">
-                      <BeatDelaySessionsManager 
-                        onSessionLoad={handleSessionLoad}
-                        currentSessionData={getCurrentSessionData()}
-                      />
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-medium">Sessioni Beat the Delay Salvate</h3>
+                          <div className="text-sm text-gray-500">
+                            {beatDelaySessions.length} sessioni trovate
+                          </div>
+                        </div>
+
+                        {beatDelaySessions.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <FolderOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                            <p>Nessuna sessione Beat the Delay salvata</p>
+                            <p className="text-sm">Crea una nuova sessione per iniziare</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {beatDelaySessions.map((session) => (
+                              <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="flex-1">
+                                      <h4 className="font-medium text-gray-900">{session.name}</h4>
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
+                                        <div>
+                                          <span className="font-medium">Bankroll:</span> {formatCurrency(session.currentBankroll)}
+                                        </div>
+                                        <div>
+                                          <span className="font-medium">Scommesse:</span> {session.betCount}
+                                        </div>
+                                        <div>
+                                          <span className="font-medium">Win Rate:</span> {
+                                            session.betCount > 0 
+                                              ? `${((session.wins / session.betCount) * 100).toFixed(1)}%`
+                                              : '0%'
+                                          }
+                                        </div>
+                                        <div>
+                                          <span className="font-medium">ROI:</span> 
+                                          <span className={`ml-1 ${
+                                            session.currentBankroll >= session.initialBankroll 
+                                              ? 'text-green-600' 
+                                              : 'text-red-600'
+                                          }`}>
+                                            {(((session.currentBankroll - session.initialBankroll) / session.initialBankroll) * 100).toFixed(1)}%
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        Creata: {new Date(session.createdAt).toLocaleDateString('it-IT')}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex space-x-2 ml-4">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs"
+                                    onClick={() => {
+                                      betting.setCurrentSession(session);
+                                      
+                                      // Carica i parametri della sessione nei form
+                                      const settings = JSON.parse(session.strategySettings);
+                                      setSessionName(session.name);
+                                      setInitialBankroll(session.initialBankroll);
+                                      setBaseStake(settings.baseStake || 10);
+                                      setTargetReturn(session.targetReturn);
+                                      setStopLoss(settings.stopLoss || 6);
+                                      
+                                      toast({
+                                        title: "Sessione caricata",
+                                        description: `Sessione "${session.name}" caricata con successo`,
+                                      });
+                                    }}
+                                  >
+                                    Carica
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-xs bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                                    onClick={() => {
+                                      if (window.confirm(`Sei sicuro di voler eliminare la sessione "${session.name}"?`)) {
+                                        betting.deleteSession(session.id!);
+                                        toast({
+                                          title: "Sessione eliminata",
+                                          description: `Sessione "${session.name}" eliminata con successo`,
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    Elimina
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </TabsContent>
                   </Tabs>
 
@@ -1145,7 +1168,7 @@ export default function StrategyBeatDelay() {
                             historicalFrequency / 100, currentOdds, true
                           );
                           
-                          placeBeatDelayBet(true);
+                          betting.placeBet(true);
                           // Vincita: ritardo si azzera o diminuisce
                           setNextBetDelay(Math.max(0, currentDelay - 1));
                           setNextBetOdds(currentOdds);
@@ -1187,7 +1210,7 @@ export default function StrategyBeatDelay() {
                             historicalFrequency / 100, currentOdds, false
                           );
                           
-                          placeBeatDelayBet(false);
+                          betting.placeBet(false);
                           // Perdita: ritardo aumenta di 1
                           setNextBetDelay(currentDelay + 1);
                           setNextBetOdds(currentOdds);
