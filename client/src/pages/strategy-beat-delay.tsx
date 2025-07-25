@@ -14,19 +14,26 @@ import SparklineChart from "@/components/sparkline-chart";
 import AnimatedProgressTracker from "@/components/animated-progress-tracker";
 import BadgesDisplay from "@/components/badges-display";
 import SessionScreenshot from "@/components/session-screenshot";
-import { ArrowLeft, Play, RotateCcw, TrendingUp, Target, Timer, Zap, AlertTriangle, CheckCircle, XCircle, Trophy, Calculator, BarChart3, Activity } from "lucide-react";
+import { ArrowLeft, Play, RotateCcw, TrendingUp, Target, Timer, Zap, AlertTriangle, CheckCircle, XCircle, Trophy, Calculator, BarChart3, Activity, FolderOpen } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { mlPredictor, type MLPrediction } from "@/lib/ml-predictor";
 import { bettingLogger } from "@/lib/betting-logger";
+import BeatDelaySessionsManager from "@/components/beat-delay-sessions-manager";
+import { useBeatDelaySessions, type BeatDelaySession, type CreateBeatDelayBetData } from "@/hooks/use-beat-delay-sessions";
 
 export default function StrategyBeatDelay() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const betting = useBetting();
+  const beatDelaySessions = useBeatDelaySessions();
   const [confirmingReset, setConfirmingReset] = useState(false);
+  
+  // Stato per gestione sessioni
+  const [showSessionsManager, setShowSessionsManager] = useState(false);
+  const [currentBeatDelaySession, setCurrentBeatDelaySession] = useState<BeatDelaySession | null>(null);
   
   // Form state
   const [initialBankroll, setInitialBankroll] = useState(1000);
@@ -85,6 +92,75 @@ export default function StrategyBeatDelay() {
   // Thresholds (aumentata soglia per test NON GIOCARE)
   const [evThreshold, setEvThreshold] = useState(0.08);
   const [recoveryAlertThreshold, setRecoveryAlertThreshold] = useState(0.10);
+
+  // Funzioni per gestione sessioni Beat the Delay
+  const handleSessionLoad = (session: BeatDelaySession) => {
+    setCurrentBeatDelaySession(session);
+    setSessionName(session.sessionName);
+    setInitialBankroll(session.initialBankroll);
+    setBaseStake(session.baseStake);
+    setTargetReturn(session.targetReturn);
+    setStopLoss(session.stopLoss);
+    
+    toast({
+      title: "Sessione caricata",
+      description: `Sessione "${session.sessionName}" caricata con successo`,
+    });
+  };
+
+  const getCurrentSessionData = () => {
+    if (!betting.currentSession) return null;
+    
+    return {
+      sessionName,
+      initialBankroll,
+      baseStake,
+      targetReturn,
+      stopLoss,
+      finalBankroll: betting.currentSession.currentBankroll,
+      totalBets: betting.currentSession.betCount,
+      totalWins: betting.currentSession.wins,
+      totalLosses: betting.currentSession.losses,
+      profitLoss: betting.currentSession.currentBankroll - initialBankroll,
+    };
+  };
+
+  const placeBeatDelayBet = (win: boolean) => {
+    // Prima salva nel sistema tradizionale
+    betting.placeBet(win);
+    
+    // Poi salva nel sistema Beat the Delay se abbiamo una sessione attiva
+    if (currentBeatDelaySession && betting.currentSession) {
+      const betData: CreateBeatDelayBetData = {
+        betNumber: betting.currentSession.betCount + 1,
+        stake: betting.nextStake,
+        odds: currentOdds,
+        potentialWin: betting.potentialWin,
+        win,
+        bankrollBefore: betting.currentSession.currentBankroll,
+        bankrollAfter: win ? 
+          betting.currentSession.currentBankroll + (betting.potentialWin - betting.nextStake) :
+          betting.currentSession.currentBankroll - betting.nextStake,
+        currentSign,
+        currentDelay,
+        historicalFrequency,
+        avgDelay,
+        maxDelay,
+        captureRate,
+        estimatedProbability,
+        expectedValue,
+        shouldPlay,
+        anomalyIndex,
+        recoveryRate,
+        mlProbability: mlPrediction.probability,
+        mlConfidence: mlPrediction.confidence,
+        combinedProbability,
+        combinedEV,
+      };
+
+      beatDelaySessions.addBet(currentBeatDelaySession.id, betData);
+    }
+  };
 
   // Calculate automatic capture rate based on historical performance
   const calculateAutoCaptureRate = () => {
@@ -770,10 +846,14 @@ export default function StrategyBeatDelay() {
                   </Alert>
 
                   <Tabs defaultValue="basic" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-4">
                       <TabsTrigger value="basic">Impostazioni Base</TabsTrigger>
                       <TabsTrigger value="statistical">Dati Statistici</TabsTrigger>
                       <TabsTrigger value="advanced">Avanzate</TabsTrigger>
+                      <TabsTrigger value="sessions">
+                        <FolderOpen className="w-4 h-4 mr-2" />
+                        Sessioni
+                      </TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="basic" className="space-y-4">
@@ -964,6 +1044,13 @@ export default function StrategyBeatDelay() {
                         </div>
                       </div>
                     </TabsContent>
+                    
+                    <TabsContent value="sessions" className="space-y-4">
+                      <BeatDelaySessionsManager 
+                        onSessionLoad={handleSessionLoad}
+                        currentSessionData={getCurrentSessionData()}
+                      />
+                    </TabsContent>
                   </Tabs>
 
                   <div className="mt-6">
@@ -1058,7 +1145,7 @@ export default function StrategyBeatDelay() {
                             historicalFrequency / 100, currentOdds, true
                           );
                           
-                          betting.placeBet(true);
+                          placeBeatDelayBet(true);
                           // Vincita: ritardo si azzera o diminuisce
                           setNextBetDelay(Math.max(0, currentDelay - 1));
                           setNextBetOdds(currentOdds);
@@ -1100,7 +1187,7 @@ export default function StrategyBeatDelay() {
                             historicalFrequency / 100, currentOdds, false
                           );
                           
-                          betting.placeBet(false);
+                          placeBeatDelayBet(false);
                           // Perdita: ritardo aumenta di 1
                           setNextBetDelay(currentDelay + 1);
                           setNextBetOdds(currentOdds);

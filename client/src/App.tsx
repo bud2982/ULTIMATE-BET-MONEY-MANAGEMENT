@@ -19,6 +19,7 @@ import DemoFull from '@/pages/demo-full';
 import DemoComplete from '@/pages/demo-complete';
 import DemoInterface from '@/pages/demo-interface';
 import DemoInvite from '@/pages/demo-invite';
+import TestBeatDelaySessions from '@/pages/test-beat-delay-sessions';
 import NotFound from '@/pages/not-found';
 
 function App() {
@@ -41,6 +42,7 @@ function App() {
       <Route path="/demo-complete" component={DemoComplete} />
       <Route path="/demo-interface" component={DemoInterface} />
       <Route path="/demo-invite" component={DemoInvite} />
+      <Route path="/test-beat-delay-sessions" component={TestBeatDelaySessions} />
       <Route path="/:rest*" component={NotFound} />
     </Router>
   );

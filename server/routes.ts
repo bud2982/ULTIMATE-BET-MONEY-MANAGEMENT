@@ -690,6 +690,135 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== BEAT THE DELAY SESSIONS API =====
+  
+  // Get all Beat the Delay sessions
+  app.get("/api/beat-delay-sessions", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+    try {
+      const sessions = await storage.getAllBeatDelaySessions();
+      res.json(sessions);
+    } catch (error) {
+      console.error('Error getting Beat the Delay sessions:', error);
+      res.status(500).json({ message: "Failed to get Beat the Delay sessions" });
+    }
+  });
+
+  // Get specific Beat the Delay session with bets
+  app.get("/api/beat-delay-sessions/:id", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid session ID" });
+      }
+
+      const session = await storage.getBeatDelaySession(id);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      const bets = await storage.getBeatDelayBets(id);
+      res.json({ session, bets });
+    } catch (error) {
+      console.error('Error getting Beat the Delay session:', error);
+      res.status(500).json({ message: "Failed to get Beat the Delay session" });
+    }
+  });
+
+  // Create new Beat the Delay session
+  app.post("/api/beat-delay-sessions", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+    try {
+      const sessionData = req.body;
+      
+      // Basic validation
+      if (!sessionData.sessionName || !sessionData.initialBankroll || !sessionData.baseStake) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const session = await storage.createBeatDelaySession(sessionData);
+      res.json(session);
+    } catch (error) {
+      console.error('Error creating Beat the Delay session:', error);
+      res.status(500).json({ message: "Failed to create Beat the Delay session" });
+    }
+  });
+
+  // Update Beat the Delay session
+  app.patch("/api/beat-delay-sessions/:id", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid session ID" });
+      }
+
+      const updates = req.body;
+      const session = await storage.updateBeatDelaySession(id, updates);
+      
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      res.json(session);
+    } catch (error) {
+      console.error('Error updating Beat the Delay session:', error);
+      res.status(500).json({ message: "Failed to update Beat the Delay session" });
+    }
+  });
+
+  // Delete Beat the Delay session
+  app.delete("/api/beat-delay-sessions/:id", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid session ID" });
+      }
+
+      await storage.deleteBeatDelaySession(id);
+      res.json({ message: "Session deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting Beat the Delay session:', error);
+      res.status(500).json({ message: "Failed to delete Beat the Delay session" });
+    }
+  });
+
+  // Add bet to Beat the Delay session
+  app.post("/api/beat-delay-sessions/:id/bets", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      if (isNaN(sessionId)) {
+        return res.status(400).json({ message: "Invalid session ID" });
+      }
+
+      const betData = req.body;
+      
+      // Basic validation
+      if (typeof betData.win !== 'boolean' || !betData.stake || !betData.odds) {
+        return res.status(400).json({ message: "Missing required bet fields" });
+      }
+
+      const result = await storage.addBeatDelayBet(sessionId, betData);
+      res.json(result);
+    } catch (error) {
+      console.error('Error adding Beat the Delay bet:', error);
+      res.status(500).json({ message: "Failed to add Beat the Delay bet" });
+    }
+  });
+
+  // Get bets for specific Beat the Delay session
+  app.get("/api/beat-delay-sessions/:id/bets", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      if (isNaN(sessionId)) {
+        return res.status(400).json({ message: "Invalid session ID" });
+      }
+
+      const bets = await storage.getBeatDelayBets(sessionId);
+      res.json(bets);
+    } catch (error) {
+      console.error('Error getting Beat the Delay bets:', error);
+      res.status(500).json({ message: "Failed to get Beat the Delay bets" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

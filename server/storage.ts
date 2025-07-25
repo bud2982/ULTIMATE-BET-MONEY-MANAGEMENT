@@ -4,8 +4,15 @@ import {
   type Session, 
   type InsertSession, 
   type Bet, 
-  type InsertBet 
+  type InsertBet
 } from "@shared/types";
+
+import {
+  type BeatDelaySession,
+  type InsertBeatDelaySession,
+  type BeatDelayBet,
+  type InsertBeatDelayBet
+} from "@shared/schema";
 
 // Extended types for better type safety
 export interface ExtendedUser {
@@ -40,6 +47,15 @@ export interface IStorage {
   createBet(bet: InsertBet): Promise<Bet>;
   updateSessionAfterBet(sessionId: number, bet: Bet): Promise<Session>;
   deleteAllBetsForSession(sessionId: number): Promise<boolean>;
+
+  // Beat the Delay operations
+  getAllBeatDelaySessions(): Promise<BeatDelaySession[]>;
+  getBeatDelaySession(id: number): Promise<BeatDelaySession | undefined>;
+  createBeatDelaySession(session: InsertBeatDelaySession): Promise<BeatDelaySession>;
+  updateBeatDelaySession(id: number, updates: Partial<BeatDelaySession>): Promise<BeatDelaySession | undefined>;
+  deleteBeatDelaySession(id: number): Promise<boolean>;
+  getBeatDelayBets(sessionId: number): Promise<BeatDelayBet[]>;
+  addBeatDelayBet(sessionId: number, bet: InsertBeatDelayBet): Promise<{ session: BeatDelaySession; bet: BeatDelayBet }>;
 }
 
 // In-memory storage for development/testing
@@ -49,6 +65,12 @@ export class InMemoryStorage implements IStorage {
   private bets: Map<number, Bet[]> = new Map();
   private nextSessionId = 1;
   private nextBetId = 1;
+
+  // Beat the Delay storage
+  private beatDelaySessions: Map<number, BeatDelaySession> = new Map();
+  private beatDelayBets: Map<number, BeatDelayBet[]> = new Map();
+  private nextBeatDelaySessionId = 1;
+  private nextBeatDelayBetId = 1;
 
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
@@ -190,6 +212,121 @@ export class InMemoryStorage implements IStorage {
     }
     
     return true;
+  }
+
+  // ===== BEAT THE DELAY METHODS =====
+
+  async getAllBeatDelaySessions(): Promise<BeatDelaySession[]> {
+    return Array.from(this.beatDelaySessions.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getBeatDelaySession(id: number): Promise<BeatDelaySession | undefined> {
+    return this.beatDelaySessions.get(id);
+  }
+
+  async createBeatDelaySession(insertSession: InsertBeatDelaySession): Promise<BeatDelaySession> {
+    const session: BeatDelaySession = {
+      id: this.nextBeatDelaySessionId++,
+      userId: insertSession.userId || null,
+      sessionName: insertSession.sessionName,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      initialBankroll: insertSession.initialBankroll,
+      baseStake: insertSession.baseStake,
+      targetReturn: insertSession.targetReturn,
+      stopLoss: insertSession.stopLoss,
+      finalBankroll: insertSession.finalBankroll,
+      totalBets: insertSession.totalBets || 0,
+      totalWins: insertSession.totalWins || 0,
+      totalLosses: insertSession.totalLosses || 0,
+      profitLoss: insertSession.profitLoss || 0,
+      winRate: insertSession.winRate || 0,
+      roi: insertSession.roi || 0,
+      notes: insertSession.notes || null,
+      status: insertSession.status || "active",
+    };
+    
+    this.beatDelaySessions.set(session.id, session);
+    this.beatDelayBets.set(session.id, []);
+    return session;
+  }
+
+  async updateBeatDelaySession(id: number, updates: Partial<BeatDelaySession>): Promise<BeatDelaySession | undefined> {
+    const session = this.beatDelaySessions.get(id);
+    if (!session) return undefined;
+    
+    const updated = { ...session, ...updates, updatedAt: new Date() };
+    this.beatDelaySessions.set(id, updated);
+    return updated;
+  }
+
+  async deleteBeatDelaySession(id: number): Promise<boolean> {
+    const deleted = this.beatDelaySessions.delete(id);
+    this.beatDelayBets.delete(id);
+    return deleted;
+  }
+
+  async getBeatDelayBets(sessionId: number): Promise<BeatDelayBet[]> {
+    return this.beatDelayBets.get(sessionId) || [];
+  }
+
+  async addBeatDelayBet(sessionId: number, insertBet: InsertBeatDelayBet): Promise<{ session: BeatDelaySession; bet: BeatDelayBet }> {
+    const session = this.beatDelaySessions.get(sessionId);
+    if (!session) {
+      throw new Error('Beat the Delay session not found');
+    }
+
+    const bet: BeatDelayBet = {
+      id: this.nextBeatDelayBetId++,
+      sessionId: insertBet.sessionId,
+      betNumber: insertBet.betNumber,
+      stake: insertBet.stake,
+      odds: insertBet.odds,
+      potentialWin: insertBet.potentialWin,
+      win: insertBet.win,
+      bankrollBefore: insertBet.bankrollBefore,
+      bankrollAfter: insertBet.bankrollAfter,
+      currentSign: insertBet.currentSign,
+      currentDelay: insertBet.currentDelay,
+      historicalFrequency: insertBet.historicalFrequency,
+      avgDelay: insertBet.avgDelay,
+      maxDelay: insertBet.maxDelay,
+      captureRate: insertBet.captureRate,
+      estimatedProbability: insertBet.estimatedProbability,
+      expectedValue: insertBet.expectedValue,
+      shouldPlay: insertBet.shouldPlay,
+      anomalyIndex: insertBet.anomalyIndex,
+      recoveryRate: insertBet.recoveryRate,
+      mlProbability: insertBet.mlProbability || 0,
+      mlConfidence: insertBet.mlConfidence || 0,
+      combinedProbability: insertBet.combinedProbability || 0,
+      combinedEV: insertBet.combinedEV || 0,
+      createdAt: new Date(),
+    };
+    
+    // Add bet to session bets
+    const sessionBets = this.beatDelayBets.get(sessionId) || [];
+    sessionBets.push(bet);
+    this.beatDelayBets.set(sessionId, sessionBets);
+    
+    // Update session statistics
+    const profitLoss = bet.win ? (bet.potentialWin - bet.stake) : -bet.stake;
+    const updatedSession: BeatDelaySession = {
+      ...session,
+      finalBankroll: bet.bankrollAfter,
+      totalBets: session.totalBets + 1,
+      totalWins: bet.win ? session.totalWins + 1 : session.totalWins,
+      totalLosses: bet.win ? session.totalLosses : session.totalLosses + 1,
+      profitLoss: session.profitLoss + profitLoss,
+      winRate: ((bet.win ? session.totalWins + 1 : session.totalWins) / (session.totalBets + 1)) * 100,
+      roi: ((session.profitLoss + profitLoss) / session.initialBankroll) * 100,
+      updatedAt: new Date()
+    };
+    
+    this.beatDelaySessions.set(sessionId, updatedSession);
+    
+    return { session: updatedSession, bet };
   }
 }
 
