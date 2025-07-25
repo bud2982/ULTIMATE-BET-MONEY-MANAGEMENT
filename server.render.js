@@ -57,15 +57,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Money Management Pro API',
-    status: 'running',
-    platform: 'render',
-    endpoints: ['/health', '/api/auth/user', '/api/sessions']
-  });
-});
+// Root endpoint removed - will be handled by static file serving or catch-all
 
 // API Routes
 app.get('/api/auth/user', (req, res) => {
@@ -159,25 +151,50 @@ app.post('/api/sessions/:id/bets', (req, res) => {
 // Try multiple possible paths for static files
 const possiblePaths = [
   path.join(__dirname, 'dist', 'public'),
+  path.join(__dirname, 'dist'),
   path.join(__dirname, 'public'),
   path.join(__dirname, 'build'),
-  path.join(__dirname, 'client', 'dist')
+  path.join(__dirname, 'client', 'dist'),
+  path.join(__dirname, 'client', 'build')
 ];
 
 let distPath = null;
 let indexPath = null;
 
-console.log('Checking paths:');
+console.log('🔍 STATIC FILES SEARCH:');
 console.log('- __dirname:', __dirname);
+console.log('- process.cwd():', process.cwd());
+
+// List all files in root directory for debugging
+try {
+  const rootFiles = fs.readdirSync(__dirname);
+  console.log('- Root directory files:', rootFiles.slice(0, 10), rootFiles.length > 10 ? '...' : '');
+} catch (err) {
+  console.log('- Error reading root directory:', err.message);
+}
 
 for (const testPath of possiblePaths) {
   const testIndex = path.join(testPath, 'index.html');
-  console.log(`- Testing: ${testPath} (exists: ${fs.existsSync(testPath)}, index: ${fs.existsSync(testIndex)})`);
+  const pathExists = fs.existsSync(testPath);
+  const indexExists = fs.existsSync(testIndex);
   
-  if (fs.existsSync(testPath) && fs.existsSync(testIndex)) {
+  console.log(`- Testing: ${testPath}`);
+  console.log(`  - Directory exists: ${pathExists}`);
+  console.log(`  - index.html exists: ${indexExists}`);
+  
+  if (pathExists) {
+    try {
+      const files = fs.readdirSync(testPath);
+      console.log(`  - Files in directory: ${files.slice(0, 5).join(', ')}${files.length > 5 ? '...' : ''}`);
+    } catch (err) {
+      console.log(`  - Error reading directory: ${err.message}`);
+    }
+  }
+  
+  if (pathExists && indexExists) {
     distPath = testPath;
     indexPath = testIndex;
-    console.log(`✅ Found static files at: ${distPath}`);
+    console.log(`✅ FOUND STATIC FILES AT: ${distPath}`);
     break;
   }
 }
@@ -196,20 +213,68 @@ if (distPath && indexPath) {
     }
   });
 } else {
-  console.log('❌ Frontend files not found');
-  console.log('Available files in __dirname:', fs.readdirSync(__dirname));
+  console.log('❌ FRONTEND FILES NOT FOUND');
+  console.log('This means the build process may have failed or files are in a different location.');
+  
+  try {
+    const rootFiles = fs.readdirSync(__dirname);
+    console.log('Available files in root:', rootFiles);
+    
+    // Check if dist directory exists but is empty or has different structure
+    const distDir = path.join(__dirname, 'dist');
+    if (fs.existsSync(distDir)) {
+      console.log('dist/ directory exists, contents:', fs.readdirSync(distDir));
+    }
+  } catch (err) {
+    console.log('Error listing files:', err.message);
+  }
+  
   console.log('Checked paths:', possiblePaths);
   
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
       res.status(404).json({ error: 'API endpoint not found' });
     } else {
-      res.json({ 
-        error: 'Frontend not built',
-        message: 'Frontend files not found. Check build process.',
-        checkedPaths: possiblePaths,
-        available_endpoints: ['/health', '/api/auth/user', '/api/sessions']
-      });
+      // Serve a basic HTML page instead of JSON for better UX
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Money Management Pro - Build Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+            .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .error { color: #e74c3c; }
+            .info { color: #3498db; margin-top: 20px; }
+            pre { background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1 class="error">⚠️ Frontend Build Error</h1>
+            <p>The frontend files were not found. This usually means:</p>
+            <ul>
+              <li>The build process failed during deployment</li>
+              <li>Files are in a different location than expected</li>
+              <li>The build command didn't complete successfully</li>
+            </ul>
+            
+            <div class="info">
+              <h3>🔧 Debug Information:</h3>
+              <p><strong>Checked paths:</strong></p>
+              <pre>${possiblePaths.join('\n')}</pre>
+              
+              <h3>📡 Available API Endpoints:</h3>
+              <ul>
+                <li><a href="/health">/health</a> - Health check</li>
+                <li><a href="/api/auth/user">/api/auth/user</a> - User info</li>
+                <li><a href="/api/sessions">/api/sessions</a> - Sessions</li>
+              </ul>
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
     }
   });
 }
