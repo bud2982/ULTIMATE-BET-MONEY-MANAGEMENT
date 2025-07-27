@@ -3,7 +3,7 @@ services:
     name: ultimate-bet-money-management
     env: node
     plan: free
-    buildCommand: npm ci --include=dev && npm run build && ls -la dist/ && ls -la dist/public/ || echo "Build failed"
+    buildCommand: npm ci --include=dev && npm run build && echo "Build completed" && ls -la dist/ && ls -la dist/public/ && echo "Files in dist/public/assets:" && ls -la dist/public/assets/ || echo "Build failed"
     startCommand: node server.render.js
     envVars:
       - key: NODE_ENV
