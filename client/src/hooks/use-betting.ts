@@ -297,8 +297,6 @@ export function useBetting() {
   function placeBet(win: boolean) {
     if (!currentSession) return;
     
-    console.log("DEBUG - placeBet start", { win, currentSession, bettingState });
-    
     // Prima salviamo la puntata corrente per aggiungerla all'array
     const currentStake = nextStake;
     

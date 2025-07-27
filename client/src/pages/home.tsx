@@ -546,7 +546,7 @@ export default function Home() {
                   )}
                 </div>
                 <p className="text-sm text-gray-600 mb-4">
-                  Progressione a cascata con incrementi percentuali fissi per massimizzare i profitti.
+                  Strategia intelligente che adatta le puntate per massimizzare i profitti e controllare i rischi.
                 </p>
                 <Button 
                   className="w-full bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 hover:from-purple-600 hover:via-pink-600 hover:to-red-600"

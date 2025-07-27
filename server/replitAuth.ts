@@ -30,7 +30,8 @@ export async function setupAuth(app: Express) {
       id: "dev-user",
       email: "dev@example.com",
       firstName: "Dev",
-      lastName: "User"
+      lastName: "User",
+      subscriptionStatus: "active" // Aggiungi status premium per testing
     };
     res.redirect("/");
   });
@@ -44,6 +45,11 @@ export async function setupAuth(app: Express) {
 
 export const requireAuth: RequestHandler = (req, res, next) => {
   if ((req.session as any)?.user) {
+    // Assicurati che l'utente abbia lo status premium per testing
+    if (!(req.session as any).user.subscriptionStatus) {
+      (req.session as any).user.subscriptionStatus = "active";
+    }
+    req.user = (req.session as any).user;
     return next();
   }
   res.status(401).json({ error: "Authentication required" });

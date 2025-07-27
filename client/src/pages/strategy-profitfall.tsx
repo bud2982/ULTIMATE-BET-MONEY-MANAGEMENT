@@ -116,6 +116,20 @@ export default function StrategyProfitFall() {
   }, [stakeIniziale, betting.currentSession]);
   
   const handleStartNewSession = () => {
+    console.log("🚀 handleStartNewSession chiamata con parametri:", {
+      sessionName,
+      initialBankroll,
+      stakeIniziale,
+      margineProfitto,
+      profitFallStopLoss,
+      targetReturn,
+      fattoreRecupero,
+      aumentoMassimoStep,
+      capMassimoAssoluto,
+      usaQuotaReale,
+      quotaRiferimento
+    });
+    
     // Validazione nome sessione
     if (!sessionName || !sessionName.trim()) {
       toast({
@@ -181,18 +195,59 @@ export default function StrategyProfitFall() {
       return;
     }
     
+    // Validazione parametri Sistema Ibrido
+    const validFattoreRecupero = Number(fattoreRecupero);
+    if (isNaN(validFattoreRecupero) || validFattoreRecupero < 30 || validFattoreRecupero > 100) {
+      toast({
+        title: "Fattore Recupero non valido",
+        description: "Il fattore di recupero deve essere tra 30% e 100%",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const validAumentoMassimoStep = Number(aumentoMassimoStep);
+    if (isNaN(validAumentoMassimoStep) || validAumentoMassimoStep <= 0) {
+      toast({
+        title: "Aumento Max Step non valido",
+        description: "L'aumento massimo per step deve essere maggiore di zero",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const validCapMassimoAssoluto = Number(capMassimoAssoluto);
+    if (isNaN(validCapMassimoAssoluto) || validCapMassimoAssoluto <= 0) {
+      toast({
+        title: "Cap Assoluto non valido",
+        description: "Il cap massimo assoluto deve essere maggiore di zero",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const validQuotaRiferimento = Number(quotaRiferimento);
+    if (isNaN(validQuotaRiferimento) || validQuotaRiferimento < 1.1) {
+      toast({
+        title: "Quota Riferimento non valida",
+        description: "La quota di riferimento deve essere almeno 1.1",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     // Crea le impostazioni della strategia PROFIT FALL (Sistema Ibrido Bilanciato)
     const strategySettings = {
       stakeIniziale: validStakeIniziale,
       margineProfitto: validMargineProfitto,
       profitFallStopLoss: validProfitFallStopLoss,
       
-      // Parametri Sistema Ibrido
-      fattoreRecupero: fattoreRecupero / 100, // Converte da percentuale a decimale
-      aumentoMassimoStep: aumentoMassimoStep,
-      capMassimoAssoluto: capMassimoAssoluto,
+      // Parametri Sistema Ibrido (usa valori validati)
+      fattoreRecupero: validFattoreRecupero / 100, // Converte da percentuale a decimale
+      aumentoMassimoStep: validAumentoMassimoStep,
+      capMassimoAssoluto: validCapMassimoAssoluto,
       usaQuotaReale: usaQuotaReale,
-      quotaRiferimento: quotaRiferimento
+      quotaRiferimento: validQuotaRiferimento
     };
     
     // Inizia una nuova sessione con tutti i campi richiesti
@@ -360,11 +415,11 @@ export default function StrategyProfitFall() {
         </div>
         
         <p className="mt-2 text-gray-600">
-          La strategia PROFIT FALL utilizza un <strong>Sistema Ibrido Bilanciato</strong> che combina:
-          <br />• <strong>Recupero Parziale</strong> (65% delle perdite per volta)
-          <br />• <strong>Quote Variabili</strong> (si adatta alle quote reali)
-          <br />• <strong>Controlli di Sicurezza</strong> (limiti graduali e cap assoluti)
-          <br />• <strong>Continuazione Intelligente</strong> (recupera tutto + profit)
+          La strategia <strong>PROFIT FALL</strong> è progettata per massimizzare i profitti e minimizzare i rischi:
+          <br />• <strong>Gestione Intelligente</strong> - Adatta automaticamente le puntate in base all'andamento
+          <br />• <strong>Controllo del Rischio</strong> - Limiti di sicurezza per proteggere il bankroll
+          <br />• <strong>Recupero Graduale</strong> - Recupera le perdite in modo sostenibile
+          <br />• <strong>Obiettivo Profitto</strong> - Punta sempre a chiudere in positivo
         </p>
       </header>
       
