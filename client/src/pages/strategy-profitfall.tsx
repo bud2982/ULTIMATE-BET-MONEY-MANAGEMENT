@@ -928,67 +928,66 @@ export default function StrategyProfitFall() {
         <div className="space-y-6">
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Come Funziona PROFIT FALL (Sistema D'Alembert)</h2>
+              <h2 className="text-xl font-semibold mb-4">Come Funziona PROFIT FALL (Sistema Ibrido)</h2>
               <div className="space-y-4 text-sm">
                 <p>
-                  <strong>PROFIT FALL</strong> utilizza un sistema di money management dinamico basato su D'Alembert 
-                  che si adatta alle quote variabili per garantire sempre il margine di profitto configurato.
+                  <strong>PROFIT FALL</strong> utilizza un innovativo <strong>Sistema Ibrido Bilanciato</strong> che combina 
+                  il recupero delle perdite con controlli avanzati di rischio per una gestione intelligente del bankroll.
                 </p>
                 
                 <div>
-                  <p className="font-semibold">Formula corretta per step ≥ 2:</p>
-                  <div className="bg-gray-100 p-3 rounded font-mono text-center my-2">
-                    puntata = (perdite totali accumulate + guadagno desiderato) / (quota corrente - 1)
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    dove: guadagno desiderato = stake iniziale × margine profitto
-                  </p>
+                  <p className="font-semibold">Come Funziona il Sistema Ibrido:</p>
                   <ul className="list-disc pl-5 space-y-2 mt-2">
                     <li>
-                      <strong>Prima puntata:</strong> Sempre uguale allo stake iniziale configurato (es: 10€)
+                      <strong>Recupero Parziale:</strong> Non recupera il 100% delle perdite, ma una percentuale configurabile (es. 65%)
                     </li>
                     <li>
-                      <strong>Dopo una perdita:</strong> La puntata viene calcolata per recuperare tutte le perdite 
-                      accumulate + ottenere il margine di profitto desiderato
+                      <strong>Aumenti Graduali:</strong> Limita l'aumento tra una puntata e l'altra per evitare escalation pericolose
                     </li>
                     <li>
-                      <strong>Dopo una vincita:</strong> La sequenza si resetta e si riparte dallo stake iniziale
+                      <strong>Cap Assoluto:</strong> Impone un limite massimo invalicabile per ogni singola puntata
+                    </li>
+                    <li>
+                      <strong>Quote Adattive:</strong> Si adatta automaticamente alle quote reali o usa una quota fissa di riferimento
                     </li>
                   </ul>
                 </div>
                 
-                <p>
-                  <strong>Stop Loss automatico:</strong> La sequenza si interrompe se le perdite superano l'importo massimo configurato.
-                </p>
-                
-                <p>
-                  <strong>Esempio pratico:</strong>
-                </p>
-                <ul className="list-disc pl-5 space-y-2">
-                  <li>Stake iniziale: 10€</li>
-                  <li>Margine profitto: 10%</li>
-                  <li>Quota: 2.0</li>
-                  <li>Stop Loss: 100€</li>
-                </ul>
-                <div className="bg-blue-50 p-3 rounded mt-2">
-                  <p className="font-medium text-blue-800">Sequenza corretta (quote variabili):</p>
-                  <ul className="text-blue-700 text-sm space-y-1">
-                    <li>• <strong>STEP 1:</strong> 10€ (stake fisso) - quota 2.0 - PERSA → perdita = 10€</li>
-                    <li>• <strong>STEP 2:</strong> (10 + 1) / (1.80-1) = 13.75€ - quota 1.80 - PERSA → perdita totale = 23.75€</li>
-                    <li>• <strong>STEP 3:</strong> (23.75 + 1) / (2.20-1) = 20.62€ - quota 2.20 - VINTA!</li>
-                    <li>• <strong>Incasso:</strong> 20.62€ × 2.20 = 45.36€</li>
-                    <li>• <strong>Profitto netto:</strong> 45.36€ - 23.75€ - 20.62€ = +0.99€ ≈ +1€ (10% di 10€)</li>
+                <div>
+                  <p className="font-semibold">Vantaggi del Sistema Ibrido:</p>
+                  <ul className="list-disc pl-5 space-y-1 mt-2">
+                    <li><strong>Sicurezza Avanzata:</strong> Tripla protezione contro perdite eccessive</li>
+                    <li><strong>Flessibilità:</strong> Parametri completamente personalizzabili</li>
+                    <li><strong>Controllo Intelligente:</strong> Bilancia recupero e prudenza</li>
+                    <li><strong>Adattabilità:</strong> Funziona con quote fisse o variabili</li>
                   </ul>
-                  <p className="text-xs text-blue-600 mt-2 font-medium">
-                    ✓ Formula corretta: recupera TUTTE le perdite + garantisce il margine configurato
-                  </p>
                 </div>
                 
-                <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 mt-4">
-                  <p className="font-medium text-yellow-800">Importante</p>
-                  <p className="text-yellow-700">
-                    Il sistema è progettato per garantire sempre il margine di profitto configurato 
-                    ad ogni vincita, indipendentemente dal momento in cui avviene nella sequenza.
+                <div>
+                  <p className="font-semibold">Parametri Chiave:</p>
+                  <ul className="list-disc pl-5 space-y-1 mt-2">
+                    <li><strong>Fattore Recupero:</strong> Percentuale delle perdite da recuperare (30-100%)</li>
+                    <li><strong>Aumento Max Step:</strong> Limite di crescita tra puntate consecutive</li>
+                    <li><strong>Cap Assoluto:</strong> Puntata massima mai superabile</li>
+                    <li><strong>Stop Loss:</strong> Limite totale di perdite accettabili</li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <p className="font-semibold">Quando Usarlo:</p>
+                  <ul className="list-disc pl-5 space-y-1 mt-2">
+                    <li>Vuoi un sistema di recupero più sicuro del D'Alembert classico</li>
+                    <li>Preferisci controlli multipli del rischio</li>
+                    <li>Desideri personalizzare completamente i parametri</li>
+                    <li>Cerchi un equilibrio tra aggressività e prudenza</li>
+                  </ul>
+                </div>
+                
+                <div className="bg-blue-50 p-3 rounded-md border border-blue-200 mt-4">
+                  <p className="font-medium text-blue-800">⚙️ Sistema Avanzato</p>
+                  <p className="text-blue-700">
+                    Il Sistema Ibrido è ideale per utenti esperti che vogliono un controllo granulare 
+                    sui parametri di rischio. Usa i parametri avanzati per personalizzare completamente il comportamento.
                   </p>
                 </div>
               </div>

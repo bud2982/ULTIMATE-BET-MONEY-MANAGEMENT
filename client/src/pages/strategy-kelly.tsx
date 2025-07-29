@@ -1340,36 +1340,37 @@ export default function StrategyKelly() {
                 <h2 className="text-xl font-semibold mb-4">Come Funziona Kelly Ridotto</h2>
                 <div className="space-y-4 text-sm">
                   <p>
-                    <strong>Kelly Ridotto</strong> applica il criterio Kelly con riduzione del rischio 
-                    per calcolare la puntata ottimale su eventi simultanei.
+                    <strong>Kelly Ridotto</strong> è un metodo intelligente che calcola automaticamente 
+                    quanto puntare su ogni evento in base alle tue probabilità di vincita.
                   </p>
                   
                   <div>
-                    <p className="font-semibold">Formula Kelly:</p>
-                    <p className="text-xs text-gray-600 mt-1 font-mono">
-                      Kelly% = [(p × (q-1)) - (1-p)] / (q-1)
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Dove p = probabilità stimata, q = quota bookmaker
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="font-semibold">Caratteristiche:</p>
+                    <p className="font-semibold">Come Funziona:</p>
                     <ul className="list-disc pl-5 space-y-1 mt-2">
-                      <li>Riduzione del Kelly pieno (25% consigliato)</li>
-                      <li>Cap di rischio simultaneo su tutti gli eventi</li>
-                      <li>Limite massimo per singola puntata</li>
-                      <li>Solo eventi con Kelly positivo vengono giocati</li>
+                      <li>Inserisci le quote del bookmaker e la tua stima di probabilità</li>
+                      <li>Il sistema calcola se l'evento è vantaggioso da giocare</li>
+                      <li>Se conveniente, suggerisce l'importo ottimale da puntare</li>
+                      <li>Protegge il tuo bankroll con limiti di sicurezza</li>
                     </ul>
                   </div>
 
                   <div>
-                    <p className="font-semibold">Regole di Sicurezza:</p>
+                    <p className="font-semibold">Vantaggi:</p>
                     <ul className="list-disc pl-5 space-y-1 mt-2">
-                      <li>Se Kelly ≤ 0, nessuna puntata</li>
-                      <li>Stake totale ≤ % max del bankroll</li>
-                      <li>Ogni evento ha un cap individuale</li>
+                      <li><strong>Sicurezza:</strong> Riduce il rischio rispetto al Kelly classico</li>
+                      <li><strong>Controllo:</strong> Limita l'investimento totale simultaneo</li>
+                      <li><strong>Intelligenza:</strong> Gioca solo eventi realmente vantaggiosi</li>
+                      <li><strong>Flessibilità:</strong> Gestisce più eventi contemporaneamente</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold">Quando Usarlo:</p>
+                    <ul className="list-disc pl-5 space-y-1 mt-2">
+                      <li>Hai buone capacità di stima delle probabilità</li>
+                      <li>Vuoi un approccio matematico e disciplinato</li>
+                      <li>Preferisci puntate variabili basate sul valore</li>
+                      <li>Cerchi crescita del bankroll a lungo termine</li>
                     </ul>
                   </div>
                 </div>

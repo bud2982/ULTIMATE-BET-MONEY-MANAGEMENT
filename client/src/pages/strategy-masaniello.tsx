@@ -669,26 +669,38 @@ export default function StrategyMasaniello() {
                 <h2 className="text-xl font-semibold mb-4">Come Funziona Multi Masaniello</h2>
                 <div className="space-y-4 text-sm">
                   <p>
-                    <strong>Multi Masaniello</strong> è un sistema di money management per eventi multipli 
-                    che calcola dinamicamente la puntata ottimale per raggiungere un obiettivo di profitto.
+                    <strong>Multi Masaniello</strong> è un sistema che ti aiuta a raggiungere un obiettivo 
+                    di profitto specifico distribuendo il rischio su più eventi programmati.
                   </p>
                   
                   <div>
-                    <p className="font-semibold">Caratteristiche:</p>
+                    <p className="font-semibold">Come Funziona:</p>
                     <ul className="list-disc pl-5 space-y-1 mt-2">
-                      <li>Puntate calcolate dinamicamente in base al progresso</li>
-                      <li>Tolleranza configurabile agli errori</li>
-                      <li>Quote personalizzabili per ogni evento</li>
-                      <li>Controllo automatico della raggiungibilità dell'obiettivo</li>
+                      <li>Definisci quanti eventi vuoi giocare e il profitto desiderato</li>
+                      <li>Il sistema calcola quanto puntare su ogni evento</li>
+                      <li>Puoi permetterti alcuni errori senza compromettere l'obiettivo</li>
+                      <li>Le puntate si adattano automaticamente ai risultati</li>
                     </ul>
                   </div>
 
                   <div>
-                    <p className="font-semibold">Formula di calcolo:</p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Puntata = (Cassa Residua × Fattore Rischio) / 
-                      (Eventi Rimanenti - Errori Tollerabili + Errori Attuali)
-                    </p>
+                    <p className="font-semibold">Vantaggi:</p>
+                    <ul className="list-disc pl-5 space-y-1 mt-2">
+                      <li><strong>Obiettivo Chiaro:</strong> Sai esattamente quanto vuoi guadagnare</li>
+                      <li><strong>Flessibilità:</strong> Puoi sbagliare alcune scommesse</li>
+                      <li><strong>Controllo:</strong> Quote personalizzabili per ogni evento</li>
+                      <li><strong>Adattabilità:</strong> Le puntate si aggiustano in corso</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold">Quando Usarlo:</p>
+                    <ul className="list-disc pl-5 space-y-1 mt-2">
+                      <li>Hai un obiettivo di profitto specifico in mente</li>
+                      <li>Vuoi distribuire il rischio su più eventi</li>
+                      <li>Preferisci un approccio pianificato e strutturato</li>
+                      <li>Hai identificato una serie di eventi interessanti</li>
+                    </ul>
                   </div>
                 </div>
               </CardContent>
