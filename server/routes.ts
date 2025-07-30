@@ -27,29 +27,30 @@ const trialUsers = new Map();
 const inviteCodes = new Map();
 const demoInvites = new Map();
 
-// Premium user middleware
-const premiumMiddleware = (req: any, res: any, next: any) => {
-  // Per testing locale, bypassa sempre il controllo premium
+// Subscription middleware - verifica che l'utente abbia un abbonamento attivo
+const subscriptionMiddleware = (req: any, res: any, next: any) => {
+  // Per testing locale, bypassa sempre il controllo
   next();
   return;
   
-  if (req.user && req.user.subscriptionStatus === 'active') {
+  if (req.user && (req.user.subscriptionStatus === 'active' || req.user.subscriptionStatus === 'trial')) {
     next();
   } else {
-    res.status(403).json({ message: 'Premium subscription required' });
+    res.status(403).json({ message: 'Abbonamento attivo richiesto' });
   }
 };
 
 // Mock auth middleware for development and local testing
 const mockAuthMiddleware = (req: any, res: any, next: any) => {
-  // Se non c'è un utente autenticato, crea un utente premium mock
+  // Se non c'è un utente autenticato, crea un utente con abbonamento attivo mock
   if (!req.user) {
     req.user = {
-      id: 'premium-user-123',
-      email: 'premium@example.com',
-      firstName: 'Premium',
+      id: 'subscriber-user-123',
+      email: 'subscriber@example.com',
+      firstName: 'Subscriber',
       lastName: 'User',
       subscriptionStatus: 'active',
+      subscriptionPlan: 'monthly', // monthly, semester, annual
       requireAuth: true
     };
   }
@@ -206,9 +207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { plan = 'monthly', amount } = req.body;
     
     const planConfigs = {
-      monthly: { amount: 999, interval: 'month', name: 'Piano Mensile' },
-      semester: { amount: 4000, interval: null, name: 'Piano Semestrale (6 mesi)' },
-      lifetime: { amount: 2400, interval: null, name: 'Piano A Vita' }
+      monthly: { amount: 1200, interval: 'month', name: 'Piano Mensile' },
+      semester: { amount: 6000, interval: null, name: 'Piano Semestrale (6 mesi)' },
+      annual: { amount: 11000, interval: null, name: 'Piano Annuale (12 mesi)' }
     };
     
     const selectedPlan = planConfigs[plan as keyof typeof planConfigs] || planConfigs.monthly;
@@ -232,8 +233,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Protected sessions routes (premium only)
-  app.get("/api/sessions", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  // Protected sessions routes (subscription required)
+  app.get("/api/sessions", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const strategy = req.query.strategy as string | undefined;
       const sessions = await storage.getAllSessions(strategy);
@@ -261,7 +262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sessions", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.post("/api/sessions", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const validatedData = req.body; // TODO: Add validation
       const newSession = await storage.createSession(validatedData);
@@ -271,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/sessions/:id", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.patch("/api/sessions/:id", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -289,7 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/sessions/:id", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.delete("/api/sessions/:id", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -307,8 +308,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bets routes (premium protected)
-  app.get("/api/sessions/:sessionId/bets", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  // Bets routes (subscription required)
+  app.get("/api/sessions/:sessionId/bets", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const sessionId = parseInt(req.params.sessionId);
       if (isNaN(sessionId)) {
@@ -322,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sessions/:sessionId/bets", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.post("/api/sessions/:sessionId/bets", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const sessionId = parseInt(req.params.sessionId);
       if (isNaN(sessionId)) {
@@ -399,9 +400,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Plan pricing mapping
       const plans = {
-        basic: { priceId: 'price_basic_monthly', amount: 999, name: 'Basic Plan' },
-        pro: { priceId: 'price_pro_monthly', amount: 1999, name: 'Pro Plan' },
-        premium: { priceId: 'price_premium_monthly', amount: 2999, name: 'Premium Plan' }
+        monthly: { priceId: 'price_monthly', amount: 1200, name: 'Piano Mensile', period: 'month' },
+        semester: { priceId: 'price_semester', amount: 6000, name: 'Piano Semestrale', period: '6months' },
+        annual: { priceId: 'price_annual', amount: 11000, name: 'Piano Annuale', period: 'year' }
       };
 
       const selectedPlan = plans[planId as keyof typeof plans];
@@ -698,7 +699,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===== BEAT THE DELAY SESSIONS API =====
   
   // Get all Beat the Delay sessions
-  app.get("/api/beat-delay-sessions", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.get("/api/beat-delay-sessions", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const sessions = await storage.getAllBeatDelaySessions();
       res.json(sessions);
@@ -709,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get specific Beat the Delay session with bets
-  app.get("/api/beat-delay-sessions/:id", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.get("/api/beat-delay-sessions/:id", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -730,7 +731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new Beat the Delay session
-  app.post("/api/beat-delay-sessions", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.post("/api/beat-delay-sessions", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const sessionData = req.body;
       
@@ -748,7 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update Beat the Delay session
-  app.patch("/api/beat-delay-sessions/:id", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.patch("/api/beat-delay-sessions/:id", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -770,7 +771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete Beat the Delay session
-  app.delete("/api/beat-delay-sessions/:id", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.delete("/api/beat-delay-sessions/:id", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -786,7 +787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add bet to Beat the Delay session
-  app.post("/api/beat-delay-sessions/:id/bets", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.post("/api/beat-delay-sessions/:id/bets", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const sessionId = parseInt(req.params.id);
       if (isNaN(sessionId)) {
@@ -809,7 +810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get bets for specific Beat the Delay session
-  app.get("/api/beat-delay-sessions/:id/bets", mockAuthMiddleware, premiumMiddleware, async (req, res) => {
+  app.get("/api/beat-delay-sessions/:id/bets", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
     try {
       const sessionId = parseInt(req.params.id);
       if (isNaN(sessionId)) {

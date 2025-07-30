@@ -8,57 +8,87 @@ import { useAuth } from '@/hooks/useAuth';
 
 const plans = [
   {
-    id: 'basic',
-    name: 'Piano Base',
-    price: 9.99,
+    id: 'monthly',
+    name: 'Piano Mensile',
+    price: 12.00,
     period: 'mese',
-    description: 'Perfetto per iniziare con le strategie di base',
+    originalPrice: null,
+    savings: null,
+    description: 'Accesso completo con fatturazione mensile',
     icon: <Zap className="w-6 h-6" />,
     features: [
-      'Strategia Profit Fall',
-      'Strategia D\'Alembert',
-      'Strategia Percentuale',
+      'Tutte le strategie di betting avanzate',
+      'Profit Fall, D\'Alembert, Percentuale',
+      'Kelly Ridotto per eventi simultanei',
+      'Multi Masaniello avanzato',
+      'Beat the Delay con ML predittivo',
+      'Sistema ML autonomo avanzato',
+      'Interactive Betting Trend Sparklines',
+      'Analytics avanzate con ROI tracking',
+      'Analisi predittiva dei trend',
+      'Esportazione dati CSV/PDF',
+      'API access per integrazioni',
+      'Backup automatico cloud',
       'Storico sessioni illimitato',
-      'Supporto email',
-      'Dashboard analytics di base'
+      'Supporto prioritario',
+      'Accesso anticipato a nuove funzionalità'
     ],
     popular: false,
     color: 'from-blue-500 to-cyan-500'
   },
   {
-    id: 'pro',
-    name: 'Piano Pro',
-    price: 19.99,
-    period: 'mese',
-    description: 'Per scommettitori esperti che vogliono strategie avanzate',
+    id: 'semester',
+    name: 'Piano Semestrale',
+    price: 60.00,
+    period: '6 mesi',
+    originalPrice: 72.00,
+    savings: 12.00,
+    description: 'Risparmia €12 con il piano semestrale',
     icon: <Star className="w-6 h-6" />,
     features: [
-      'Tutte le funzionalità del Piano Base',
+      'Tutte le strategie di betting avanzate',
+      'Profit Fall, D\'Alembert, Percentuale',
       'Kelly Ridotto per eventi simultanei',
       'Multi Masaniello avanzato',
+      'Beat the Delay con ML predittivo',
+      'Sistema ML autonomo avanzato',
       'Interactive Betting Trend Sparklines',
       'Analytics avanzate con ROI tracking',
+      'Analisi predittiva dei trend',
       'Esportazione dati CSV/PDF',
-      'Supporto prioritario'
+      'API access per integrazioni',
+      'Backup automatico cloud',
+      'Storico sessioni illimitato',
+      'Supporto prioritario',
+      'Accesso anticipato a nuove funzionalità'
     ],
     popular: true,
     color: 'from-purple-500 to-pink-500'
   },
   {
-    id: 'premium',
-    name: 'Piano Premium',
-    price: 29.99,
-    period: 'mese',
-    description: 'La soluzione completa per professionisti',
+    id: 'annual',
+    name: 'Piano Annuale',
+    price: 110.00,
+    period: '12 mesi',
+    originalPrice: 144.00,
+    savings: 34.00,
+    description: 'Massimo risparmio con il piano annuale',
     icon: <Crown className="w-6 h-6" />,
     features: [
-      'Tutte le funzionalità del Piano Pro',
+      'Tutte le strategie di betting avanzate',
+      'Profit Fall, D\'Alembert, Percentuale',
+      'Kelly Ridotto per eventi simultanei',
+      'Multi Masaniello avanzato',
       'Beat the Delay con ML predittivo',
       'Sistema ML autonomo avanzato',
+      'Interactive Betting Trend Sparklines',
+      'Analytics avanzate con ROI tracking',
       'Analisi predittiva dei trend',
+      'Esportazione dati CSV/PDF',
       'API access per integrazioni',
       'Backup automatico cloud',
-      'Consulenza strategica personalizzata',
+      'Storico sessioni illimitato',
+      'Supporto prioritario',
       'Accesso anticipato a nuove funzionalità'
     ],
     popular: false,
@@ -134,6 +164,17 @@ export default function Pricing() {
                   <span className="text-4xl font-bold text-gray-900">€{plan.price}</span>
                   <span className="text-lg text-gray-600 ml-1">/{plan.period}</span>
                 </div>
+                
+                {plan.savings && (
+                  <div className="mt-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-500 line-through">€{plan.originalPrice}</span>
+                      <span className="text-sm font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">
+                        Risparmi €{plan.savings}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 <p className="text-gray-600 mt-2">{plan.description}</p>
               </CardHeader>
