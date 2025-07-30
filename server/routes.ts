@@ -392,8 +392,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Payment Routes - Demo Mode
-  // Create subscription endpoint (demo version)
+  // Payment Routes - Production Ready
+  // Create subscription endpoint with Stripe integration
   app.post('/api/create-subscription', mockAuthMiddleware, async (req, res) => {
     try {
       const { planId } = req.body;
@@ -410,16 +410,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Invalid plan selected' });
       }
 
-      // Demo mode - return mock data without initializing Stripe
-      res.json({
-        clientSecret: null,
-        message: `Demo Mode: ${selectedPlan.name} - In production, this would connect to Stripe for payment processing.`,
-        plan: selectedPlan,
-        demoMode: true
+      // Check if Stripe is configured
+      if (!process.env.STRIPE_SECRET_KEY) {
+        // Fallback to demo mode
+        return res.json({
+          clientSecret: null,
+          message: `Demo Mode: ${selectedPlan.name} - Configure STRIPE_SECRET_KEY to enable real payments.`,
+          plan: selectedPlan,
+          demoMode: true
+        });
+      }
+
+      // Initialize Stripe
+      const Stripe = require('stripe');
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: '2023-10-16',
       });
+
+      // Create or retrieve customer
+      let customer;
+      const user = req.user;
+      
+      if (user.stripeCustomerId) {
+        // Retrieve existing customer
+        customer = await stripe.customers.retrieve(user.stripeCustomerId);
+      } else {
+        // Create new customer
+        customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+          metadata: {
+            userId: user.id
+          }
+        });
+        
+        // TODO: Update user with stripeCustomerId in database
+        // await updateUserStripeCustomerId(user.id, customer.id);
+      }
+
+      // Create subscription
+      const subscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{ price: selectedPlan.priceId }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent'],
+        trial_period_days: 7, // 7 giorni di prova gratuita
+        metadata: {
+          planId: planId,
+          userId: user.id
+        }
+      });
+
+      const paymentIntent = subscription.latest_invoice.payment_intent;
+
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: paymentIntent.client_secret,
+        plan: selectedPlan,
+        customerId: customer.id,
+        demoMode: false
+      });
+
     } catch (error) {
       console.error('Subscription creation error:', error);
-      res.status(500).json({ message: 'Failed to create subscription' });
+      res.status(500).json({ 
+        message: 'Failed to create subscription',
+        error: error.message 
+      });
     }
   });
 

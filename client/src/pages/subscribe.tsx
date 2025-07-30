@@ -4,7 +4,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { ArrowLeft, CreditCard, Check } from "lucide-react";
+import { ArrowLeft, CreditCard, Check, Loader2 } from "lucide-react";
+import { Elements } from '@stripe/react-stripe-js';
+import stripePromise from '@/lib/stripe';
+import StripeCheckoutForm from '@/components/StripeCheckoutForm';
 
 // Demo version without Stripe integration
 const DemoPaymentForm = ({ planId }: { planId: string }) => {
@@ -88,25 +91,35 @@ const DemoPaymentForm = ({ planId }: { planId: string }) => {
 
 export default function Subscribe() {
   const [clientSecret, setClientSecret] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [planData, setPlanData] = useState(null);
   const { toast } = useToast();
 
   // Get plan from URL params
   const urlParams = new URLSearchParams(window.location.search);
-  const planId = urlParams.get('plan') || 'basic';
+  const planId = urlParams.get('plan') || 'monthly';
 
   useEffect(() => {
     // Create subscription for the selected plan
+    setIsLoading(true);
     apiRequest("POST", "/api/create-subscription", { planId })
       .then(async (res) => {
         const data = await res.json();
-        setClientSecret(data.clientSecret);
-        if (data.message) {
+        
+        if (data.demoMode) {
+          setIsDemoMode(true);
           toast({
-            title: "Development Mode",
+            title: "Demo Mode Active",
             description: data.message,
             variant: "default",
           });
+        } else {
+          setClientSecret(data.clientSecret);
+          setPlanData(data.plan);
         }
+        
+        setIsLoading(false);
       })
       .catch((error) => {
         toast({
@@ -115,9 +128,68 @@ export default function Subscribe() {
           variant: "destructive",
         });
         console.error('Payment initialization error:', error);
+        setIsLoading(false);
       });
   }, [toast, planId]);
 
-  // Always show demo interface since Stripe is disabled
-  return <DemoPaymentForm planId={planId} />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-gray-600">Inizializzazione pagamento...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show demo interface if Stripe is not configured
+  if (isDemoMode) {
+    return <DemoPaymentForm planId={planId} />;
+  }
+
+  // Show Stripe payment interface
+  const appearance = {
+    theme: 'stripe' as const,
+    variables: {
+      colorPrimary: '#3b82f6',
+    },
+  };
+
+  const options = {
+    clientSecret,
+    appearance,
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <Card className="max-w-md w-full">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+            <CreditCard className="w-6 h-6 text-blue-600" />
+          </div>
+          <CardTitle className="text-xl font-bold">
+            Completa il Pagamento
+          </CardTitle>
+          {planData && (
+            <p className="text-gray-600 mt-2">
+              {planData.name} - €{(planData.amount / 100).toFixed(2)}
+            </p>
+          )}
+        </CardHeader>
+        
+        <CardContent>
+          {clientSecret && (
+            <Elements options={options} stripe={stripePromise}>
+              <StripeCheckoutForm planId={planId} />
+            </Elements>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

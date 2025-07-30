@@ -538,15 +538,33 @@ export default function StrategyBeatDelay() {
                     {formatCurrency(betting.currentSession.currentBankroll)}
                   </div>
                 </div>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={handleReset}
-                  className={confirmingReset ? "bg-red-600 animate-pulse" : ""}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  {confirmingReset ? "Conferma Reset" : "Reset"}
-                </Button>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      betting.saveSession();
+                      toast({
+                        title: "Sessione Salvata",
+                        description: "La sessione è stata salvata con successo.",
+                        variant: "default"
+                      });
+                    }}
+                    className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                  >
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                    Salva Sessione
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={handleReset}
+                    className={confirmingReset ? "bg-red-600 animate-pulse" : ""}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    {confirmingReset ? "Conferma Reset" : "Reset"}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
@@ -1771,6 +1789,87 @@ export default function StrategyBeatDelay() {
             )}
           </div>
         </div>
+        
+        {/* Sessioni Salvate */}
+        {Array.isArray(betting.sessions) && betting.sessions.filter((session: SessionData) => session.strategy === 'beat-delay').length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <FolderOpen className="w-5 h-5 mr-2" />
+              Sessioni Beat the Delay Salvate
+            </h2>
+            
+            <div className="space-y-4">
+              {betting.sessions
+                .filter((session: SessionData) => session.strategy === 'beat-delay')
+                .map((session: SessionData) => (
+                  <Card key={session.id} className="overflow-hidden border-purple-200">
+                    <CardContent className="p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-medium text-lg">{session.name}</h3>
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                          Beat the Delay
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Bankroll:</span>
+                          <div className="font-medium">{formatCurrency(session.initialBankroll)}</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Attuale:</span>
+                          <div className={`font-medium ${
+                            session.currentBankroll >= session.initialBankroll 
+                              ? 'text-green-600' 
+                              : 'text-red-600'
+                          }`}>
+                            {formatCurrency(session.currentBankroll)}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Scommesse:</span>
+                          <div className="font-medium">{session.betCount}</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Performance:</span>
+                          <div className={`font-medium ${
+                            session.currentBankroll >= session.initialBankroll 
+                              ? 'text-green-600' 
+                              : 'text-red-600'
+                          }`}>
+                            {((session.currentBankroll - session.initialBankroll) / session.initialBankroll * 100).toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                          onClick={() => betting.setCurrentSession(session)}
+                        >
+                          Carica Sessione
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                          onClick={() => {
+                            if (confirm(`Sei sicuro di voler eliminare la sessione "${session.name}"?`)) {
+                              betting.deleteSession(session.id!);
+                            }
+                          }}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

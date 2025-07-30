@@ -14,6 +14,7 @@ import Pricing from '@/pages/pricing';
 import Subscribe from '@/pages/subscribe';
 import Checkout from '@/pages/checkout';
 import PaymentSuccess from '@/pages/payment-success';
+import SubscriptionSuccess from '@/pages/subscription-success';
 import DemoAccess from '@/pages/demo-access';
 import DemoFull from '@/pages/demo-full';
 import DemoComplete from '@/pages/demo-complete';
@@ -37,6 +38,7 @@ function App() {
       <Route path="/subscribe" component={Subscribe} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/payment-success" component={PaymentSuccess} />
+      <Route path="/subscription-success" component={SubscriptionSuccess} />
       <Route path="/demo-access" component={DemoAccess} />
       <Route path="/demo-full" component={DemoFull} />
       <Route path="/demo-complete" component={DemoComplete} />
