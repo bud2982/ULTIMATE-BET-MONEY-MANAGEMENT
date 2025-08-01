@@ -58,6 +58,15 @@ const mockAuthMiddleware = (req: any, res: any, next: any) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      storage: process.env.DATABASE_URL?.startsWith('postgres') ? 'database' : 'memory'
+    });
+  });
+
   // Setup authentication only in production
   if (process.env.NODE_ENV === 'production') {
     await setupAuth(app);

@@ -14,6 +14,10 @@ import {
   type InsertBeatDelayBet
 } from "@shared/schema";
 
+import { db } from "./db";
+import { users, sessions, bets, beatDelaySessionsTable, beatDelayBetsTable } from "@shared/database";
+import { eq, and, desc } from "drizzle-orm";
+
 // Extended types for better type safety
 export interface ExtendedUser {
   id: string;
@@ -56,6 +60,396 @@ export interface IStorage {
   deleteBeatDelaySession(id: number): Promise<boolean>;
   getBeatDelayBets(sessionId: number): Promise<BeatDelayBet[]>;
   addBeatDelayBet(sessionId: number, bet: InsertBeatDelayBet): Promise<{ session: BeatDelaySession; bet: BeatDelayBet }>;
+}
+
+// Database storage implementation using PostgreSQL
+export class DatabaseStorage implements IStorage {
+  // User operations
+  async getUser(id: string): Promise<User | undefined> {
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return undefined;
+    }
+  }
+
+  async upsertUser(userData: ExtendedUser): Promise<User> {
+    try {
+      const user = {
+        id: userData.id,
+        email: userData.email || null,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        profileImageUrl: userData.profileImageUrl || null,
+        stripeCustomerId: userData.stripeCustomerId || null,
+        stripeSubscriptionId: userData.stripeSubscriptionId || null,
+        subscriptionStatus: userData.subscriptionStatus || "inactive",
+        subscriptionEndsAt: userData.subscriptionEndsAt || null,
+        createdAt: userData.createdAt || new Date(),
+        updatedAt: new Date(),
+      };
+
+      const result = await db.insert(users)
+        .values(user)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            profileImageUrl: user.profileImageUrl,
+            stripeCustomerId: user.stripeCustomerId,
+            stripeSubscriptionId: user.stripeSubscriptionId,
+            subscriptionStatus: user.subscriptionStatus,
+            subscriptionEndsAt: user.subscriptionEndsAt,
+            updatedAt: user.updatedAt,
+          }
+        })
+        .returning();
+
+      return result[0];
+    } catch (error) {
+      console.error('Error upserting user:', error);
+      throw error;
+    }
+  }
+
+  async updateUserSubscription(id: string, subscription: Partial<User>): Promise<User> {
+    try {
+      const result = await db.update(users)
+        .set({
+          ...subscription,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, id))
+        .returning();
+
+      if (!result[0]) {
+        throw new Error('User not found');
+      }
+
+      return result[0];
+    } catch (error) {
+      console.error('Error updating user subscription:', error);
+      throw error;
+    }
+  }
+
+  // Session operations
+  async getAllSessions(strategy?: string): Promise<Session[]> {
+    try {
+      let query = db.select().from(sessions).orderBy(desc(sessions.createdAt));
+      
+      if (strategy) {
+        query = query.where(eq(sessions.strategy, strategy));
+      }
+
+      return await query;
+    } catch (error) {
+      console.error('Error getting all sessions:', error);
+      return [];
+    }
+  }
+
+  async getSession(id: number): Promise<Session | undefined> {
+    try {
+      const result = await db.select().from(sessions).where(eq(sessions.id, id)).limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error getting session:', error);
+      return undefined;
+    }
+  }
+
+  async createSession(sessionData: InsertSession): Promise<Session> {
+    try {
+      const newSession = {
+        userId: sessionData.userId || null,
+        name: sessionData.name,
+        initialBankroll: sessionData.initialBankroll,
+        currentBankroll: sessionData.currentBankroll,
+        targetReturn: sessionData.targetReturn,
+        strategy: sessionData.strategy,
+        betCount: sessionData.betCount || 0,
+        wins: sessionData.wins || 0,
+        losses: sessionData.losses || 0,
+        strategySettings: sessionData.strategySettings,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const result = await db.insert(sessions).values(newSession).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating session:', error);
+      throw error;
+    }
+  }
+
+  async updateSession(id: number, updatedFields: Partial<Session>): Promise<Session | undefined> {
+    try {
+      const result = await db.update(sessions)
+        .set({
+          ...updatedFields,
+          updatedAt: new Date()
+        })
+        .where(eq(sessions.id, id))
+        .returning();
+
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error updating session:', error);
+      return undefined;
+    }
+  }
+
+  async deleteSession(id: number): Promise<boolean> {
+    try {
+      // First delete all bets for this session
+      await db.delete(bets).where(eq(bets.sessionId, id));
+      
+      // Then delete the session
+      const result = await db.delete(sessions).where(eq(sessions.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      return false;
+    }
+  }
+
+  // Bet operations
+  async getBetsBySessionId(sessionId: number): Promise<Bet[]> {
+    try {
+      return await db.select().from(bets)
+        .where(eq(bets.sessionId, sessionId))
+        .orderBy(bets.betNumber);
+    } catch (error) {
+      console.error('Error getting bets by session ID:', error);
+      return [];
+    }
+  }
+
+  async createBet(betData: InsertBet): Promise<Bet> {
+    try {
+      const newBet = {
+        sessionId: betData.sessionId || null,
+        betNumber: betData.betNumber,
+        stake: betData.stake,
+        odds: betData.odds,
+        potentialWin: betData.potentialWin,
+        win: betData.win,
+        bankrollBefore: betData.bankrollBefore,
+        bankrollAfter: betData.bankrollAfter,
+        createdAt: new Date(),
+      };
+
+      const result = await db.insert(bets).values(newBet).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating bet:', error);
+      throw error;
+    }
+  }
+
+  async updateSessionAfterBet(sessionId: number, bet: Bet): Promise<Session> {
+    try {
+      // Get current session
+      const currentSession = await this.getSession(sessionId);
+      if (!currentSession) {
+        throw new Error('Session not found');
+      }
+
+      // Update session statistics
+      const updatedSession = {
+        currentBankroll: bet.bankrollAfter,
+        betCount: currentSession.betCount + 1,
+        wins: bet.win ? currentSession.wins + 1 : currentSession.wins,
+        losses: bet.win ? currentSession.losses : currentSession.losses + 1,
+        updatedAt: new Date(),
+      };
+
+      const result = await db.update(sessions)
+        .set(updatedSession)
+        .where(eq(sessions.id, sessionId))
+        .returning();
+
+      return result[0];
+    } catch (error) {
+      console.error('Error updating session after bet:', error);
+      throw error;
+    }
+  }
+
+  async deleteAllBetsForSession(sessionId: number): Promise<boolean> {
+    try {
+      await db.delete(bets).where(eq(bets.sessionId, sessionId));
+      return true;
+    } catch (error) {
+      console.error('Error deleting all bets for session:', error);
+      return false;
+    }
+  }
+
+  // Beat the Delay operations
+  async getAllBeatDelaySessions(): Promise<BeatDelaySession[]> {
+    try {
+      return await db.select().from(beatDelaySessionsTable)
+        .orderBy(desc(beatDelaySessionsTable.createdAt));
+    } catch (error) {
+      console.error('Error getting all Beat the Delay sessions:', error);
+      return [];
+    }
+  }
+
+  async getBeatDelaySession(id: number): Promise<BeatDelaySession | undefined> {
+    try {
+      const result = await db.select().from(beatDelaySessionsTable)
+        .where(eq(beatDelaySessionsTable.id, id))
+        .limit(1);
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error getting Beat the Delay session:', error);
+      return undefined;
+    }
+  }
+
+  async createBeatDelaySession(sessionData: InsertBeatDelaySession): Promise<BeatDelaySession> {
+    try {
+      const newSession = {
+        userId: sessionData.userId || null,
+        sessionName: sessionData.sessionName,
+        initialBankroll: sessionData.initialBankroll,
+        baseStake: sessionData.baseStake,
+        targetReturn: sessionData.targetReturn,
+        stopLoss: sessionData.stopLoss,
+        finalBankroll: sessionData.finalBankroll,
+        totalBets: sessionData.totalBets || 0,
+        totalWins: sessionData.totalWins || 0,
+        totalLosses: sessionData.totalLosses || 0,
+        profitLoss: sessionData.profitLoss || 0,
+        winRate: sessionData.winRate || 0,
+        roi: sessionData.roi || 0,
+        notes: sessionData.notes || null,
+        status: sessionData.status || 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const result = await db.insert(beatDelaySessionsTable).values(newSession).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating Beat the Delay session:', error);
+      throw error;
+    }
+  }
+
+  async updateBeatDelaySession(id: number, updates: Partial<BeatDelaySession>): Promise<BeatDelaySession | undefined> {
+    try {
+      const result = await db.update(beatDelaySessionsTable)
+        .set({
+          ...updates,
+          updatedAt: new Date()
+        })
+        .where(eq(beatDelaySessionsTable.id, id))
+        .returning();
+
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error updating Beat the Delay session:', error);
+      return undefined;
+    }
+  }
+
+  async deleteBeatDelaySession(id: number): Promise<boolean> {
+    try {
+      // First delete all bets for this session
+      await db.delete(beatDelayBetsTable).where(eq(beatDelayBetsTable.sessionId, id));
+      
+      // Then delete the session
+      await db.delete(beatDelaySessionsTable).where(eq(beatDelaySessionsTable.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting Beat the Delay session:', error);
+      return false;
+    }
+  }
+
+  async getBeatDelayBets(sessionId: number): Promise<BeatDelayBet[]> {
+    try {
+      return await db.select().from(beatDelayBetsTable)
+        .where(eq(beatDelayBetsTable.sessionId, sessionId))
+        .orderBy(beatDelayBetsTable.betNumber);
+    } catch (error) {
+      console.error('Error getting Beat the Delay bets:', error);
+      return [];
+    }
+  }
+
+  async addBeatDelayBet(sessionId: number, betData: InsertBeatDelayBet): Promise<{ session: BeatDelaySession; bet: BeatDelayBet }> {
+    try {
+      // Get current session
+      const session = await this.getBeatDelaySession(sessionId);
+      if (!session) {
+        throw new Error('Beat the Delay session not found');
+      }
+
+      // Create the bet
+      const newBet = {
+        sessionId: sessionId,
+        betNumber: betData.betNumber,
+        stake: betData.stake,
+        odds: betData.odds,
+        potentialWin: betData.potentialWin,
+        win: betData.win,
+        bankrollBefore: betData.bankrollBefore,
+        bankrollAfter: betData.bankrollAfter,
+        currentSign: betData.currentSign,
+        currentDelay: betData.currentDelay,
+        historicalFrequency: betData.historicalFrequency,
+        avgDelay: betData.avgDelay,
+        maxDelay: betData.maxDelay,
+        captureRate: betData.captureRate,
+        estimatedProbability: betData.estimatedProbability,
+        expectedValue: betData.expectedValue,
+        shouldPlay: betData.shouldPlay,
+        anomalyIndex: betData.anomalyIndex,
+        recoveryRate: betData.recoveryRate,
+        mlProbability: betData.mlProbability || 0,
+        mlConfidence: betData.mlConfidence || 0,
+        combinedProbability: betData.combinedProbability || 0,
+        combinedEV: betData.combinedEV || 0,
+        createdAt: new Date(),
+      };
+
+      const betResult = await db.insert(beatDelayBetsTable).values(newBet).returning();
+      const bet = betResult[0];
+
+      // Update session statistics
+      const profitLoss = bet.win ? (bet.potentialWin - bet.stake) : -bet.stake;
+      const updatedSession = {
+        finalBankroll: bet.bankrollAfter,
+        totalBets: session.totalBets + 1,
+        totalWins: bet.win ? session.totalWins + 1 : session.totalWins,
+        totalLosses: bet.win ? session.totalLosses : session.totalLosses + 1,
+        profitLoss: session.profitLoss + profitLoss,
+        winRate: ((bet.win ? session.totalWins + 1 : session.totalWins) / (session.totalBets + 1)) * 100,
+        roi: ((session.profitLoss + profitLoss) / session.initialBankroll) * 100,
+        updatedAt: new Date()
+      };
+
+      const sessionResult = await db.update(beatDelaySessionsTable)
+        .set(updatedSession)
+        .where(eq(beatDelaySessionsTable.id, sessionId))
+        .returning();
+
+      return { session: sessionResult[0], bet };
+    } catch (error) {
+      console.error('Error adding Beat the Delay bet:', error);
+      throw error;
+    }
+  }
 }
 
 // In-memory storage for development/testing
@@ -330,5 +724,26 @@ export class InMemoryStorage implements IStorage {
   }
 }
 
-// Export storage instance - using InMemoryStorage for now to avoid DB issues
-export const storage = new InMemoryStorage();
+// Create storage instance with fallback
+function createStorage(): IStorage {
+  try {
+    // Try to use DatabaseStorage if DATABASE_URL is configured for PostgreSQL
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres')) {
+      console.log('Using DatabaseStorage with PostgreSQL');
+      return new DatabaseStorage();
+    } else {
+      console.log('Using InMemoryStorage (DATABASE_URL not configured for PostgreSQL)');
+      return new InMemoryStorage();
+    }
+  } catch (error) {
+    console.warn('Failed to initialize DatabaseStorage, falling back to InMemoryStorage:', error);
+    return new InMemoryStorage();
+  }
+}
+
+// Export storage instance - with automatic fallback
+export const storage = createStorage();
+
+// Keep both implementations available for testing
+export const databaseStorage = new DatabaseStorage();
+export const inMemoryStorage = new InMemoryStorage();

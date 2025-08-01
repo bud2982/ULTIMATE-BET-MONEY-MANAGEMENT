@@ -10,10 +10,43 @@ import { calculateNextStake, calculatePotentialWin } from '@/lib/betting-strateg
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 
+// LocalStorage keys
+const STORAGE_KEYS = {
+  CURRENT_SESSION: 'betting_current_session',
+  BETTING_STATE: 'betting_state',
+  SESSIONS_CACHE: 'betting_sessions_cache',
+  BETS_CACHE: 'betting_bets_cache'
+};
+
+// LocalStorage utilities
+const saveToLocalStorage = (key: string, data: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.warn('Failed to save to localStorage:', error);
+  }
+};
+
+const loadFromLocalStorage = (key: string) => {
+  try {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : null;
+  } catch (error) {
+    console.warn('Failed to load from localStorage:', error);
+    return null;
+  }
+};
+
 export function useBetting() {
   const queryClient = useQueryClient();
-  const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
-  const [bettingState, setBettingState] = useState<BettingState>({});
+  const [currentSession, setCurrentSession] = useState<SessionData | null>(() => {
+    // Load current session from localStorage on initialization
+    return loadFromLocalStorage(STORAGE_KEYS.CURRENT_SESSION);
+  });
+  const [bettingState, setBettingState] = useState<BettingState>(() => {
+    // Load betting state from localStorage on initialization
+    return loadFromLocalStorage(STORAGE_KEYS.BETTING_STATE) || {};
+  });
   const [nextStake, setNextStake] = useState<number>(0);
   const [stakePercentage, setStakePercentage] = useState<number>(10); // Default 10% della cassa
   const [betOdds, setBetOdds] = useState<number>(1.8);
@@ -29,10 +62,19 @@ export function useBetting() {
   } = useQuery({
     queryKey: ['/api/sessions', currentSession?.strategy],
     queryFn: async () => {
-      const res = await apiRequest('GET', '/api/sessions');
-      return await res.json();
+      try {
+        const res = await apiRequest('GET', '/api/sessions');
+        return await res.json();
+      } catch (error) {
+        console.warn('Failed to fetch sessions from server, using localStorage cache:', error);
+        // Fallback to localStorage cache
+        const cachedSessions = loadFromLocalStorage(STORAGE_KEYS.SESSIONS_CACHE) || [];
+        return cachedSessions;
+      }
     },
-    enabled: true
+    enabled: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1
   });
 
   // Get bets for current session
@@ -45,17 +87,47 @@ export function useBetting() {
     queryKey: ['/api/sessions', currentSession?.id, 'bets', forceRefresh],
     queryFn: async () => {
       if (!currentSession?.id) return [];
-      const res = await apiRequest('GET', `/api/sessions/${currentSession.id}/bets`);
-      return await res.json();
+      try {
+        const res = await apiRequest('GET', `/api/sessions/${currentSession.id}/bets`);
+        return await res.json();
+      } catch (error) {
+        console.warn('Failed to fetch bets from server, using localStorage cache:', error);
+        // Fallback to localStorage cache
+        const cachedBets = loadFromLocalStorage(`${STORAGE_KEYS.BETS_CACHE}_${currentSession.id}`) || [];
+        return cachedBets;
+      }
     },
-    enabled: !!currentSession?.id
+    enabled: !!currentSession?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1
   });
 
   // Create new session
   const createSessionMutation = useMutation({
     mutationFn: async (newSession: SessionData) => {
-      const res = await apiRequest('POST', '/api/sessions', newSession);
-      return await res.json();
+      try {
+        const res = await apiRequest('POST', '/api/sessions', newSession);
+        return await res.json();
+      } catch (error) {
+        console.warn('Failed to create session on server, saving locally:', error);
+        // Create session locally with a temporary ID
+        const localSession = {
+          ...newSession,
+          id: Date.now(), // Use timestamp as temporary ID
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          betCount: 0,
+          wins: 0,
+          losses: 0
+        };
+        
+        // Save to localStorage
+        const cachedSessions = loadFromLocalStorage(STORAGE_KEYS.SESSIONS_CACHE) || [];
+        cachedSessions.unshift(localSession);
+        saveToLocalStorage(STORAGE_KEYS.SESSIONS_CACHE, cachedSessions);
+        
+        return localSession;
+      }
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', data.strategy] });
@@ -96,8 +168,48 @@ export function useBetting() {
   // Add bet to session
   const addBetMutation = useMutation({
     mutationFn: async ({ sessionId, bet }: { sessionId: number, bet: BetData }) => {
-      const res = await apiRequest('POST', `/api/sessions/${sessionId}/bets`, bet);
-      return await res.json();
+      try {
+        const res = await apiRequest('POST', `/api/sessions/${sessionId}/bets`, bet);
+        return await res.json();
+      } catch (error) {
+        console.warn('Failed to add bet on server, saving locally:', error);
+        
+        // Create bet locally
+        const localBet = {
+          ...bet,
+          id: Date.now(), // Use timestamp as temporary ID
+          sessionId,
+          createdAt: new Date()
+        };
+        
+        // Update local session
+        const cachedSessions = loadFromLocalStorage(STORAGE_KEYS.SESSIONS_CACHE) || [];
+        const sessionIndex = cachedSessions.findIndex((s: any) => s.id === sessionId);
+        
+        if (sessionIndex !== -1) {
+          const session = cachedSessions[sessionIndex];
+          const updatedSession = {
+            ...session,
+            currentBankroll: bet.bankrollAfter,
+            betCount: session.betCount + 1,
+            wins: bet.win ? session.wins + 1 : session.wins,
+            losses: bet.win ? session.losses : session.losses + 1,
+            updatedAt: new Date()
+          };
+          
+          cachedSessions[sessionIndex] = updatedSession;
+          saveToLocalStorage(STORAGE_KEYS.SESSIONS_CACHE, cachedSessions);
+          
+          // Save bet to local cache
+          const cachedBets = loadFromLocalStorage(`${STORAGE_KEYS.BETS_CACHE}_${sessionId}`) || [];
+          cachedBets.push(localBet);
+          saveToLocalStorage(`${STORAGE_KEYS.BETS_CACHE}_${sessionId}`, cachedBets);
+          
+          return { session: updatedSession, bet: localBet };
+        }
+        
+        throw error;
+      }
     },
     onSuccess: (data) => {
       // Forziamo l'aggiornamento anche quando aggiungiamo scommesse
@@ -160,6 +272,30 @@ export function useBetting() {
       setBettingState(updatedState);
     }
   }, [currentSession]);
+
+  // Save current session to localStorage when it changes
+  useEffect(() => {
+    saveToLocalStorage(STORAGE_KEYS.CURRENT_SESSION, currentSession);
+  }, [currentSession]);
+
+  // Save betting state to localStorage when it changes
+  useEffect(() => {
+    saveToLocalStorage(STORAGE_KEYS.BETTING_STATE, bettingState);
+  }, [bettingState]);
+
+  // Save sessions cache to localStorage when they change
+  useEffect(() => {
+    if (sessions) {
+      saveToLocalStorage(STORAGE_KEYS.SESSIONS_CACHE, sessions);
+    }
+  }, [sessions]);
+
+  // Save bets cache to localStorage when they change
+  useEffect(() => {
+    if (bets && currentSession?.id) {
+      saveToLocalStorage(`${STORAGE_KEYS.BETS_CACHE}_${currentSession.id}`, bets);
+    }
+  }, [bets, currentSession?.id]);
 
   // Aggiorna la puntata (valore in euro) quando la percentuale cambia
   useEffect(() => {

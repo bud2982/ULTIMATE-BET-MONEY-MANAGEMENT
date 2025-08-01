@@ -23,30 +23,38 @@ import DemoInvite from '@/pages/demo-invite';
 import TestBeatDelaySessions from '@/pages/test-beat-delay-sessions';
 import NotFound from '@/pages/not-found';
 
+// Components
+import SyncStatus from '@/components/sync-status';
+
 function App() {
   return (
-    <Router>
-      <Route path="/" component={Home} />
-      <Route path="/strategia/percentage" component={StrategyPercentage} />
-      <Route path="/strategia/dalembert" component={StrategyDalembert} />
-      <Route path="/strategia/masaniello" component={StrategyMasaniello} />
-      <Route path="/strategia/kelly" component={StrategyKelly} />
-      <Route path="/strategia/beat-delay" component={StrategyBeatDelay} />
-      <Route path="/strategia/profitfall" component={StrategyProfitfall} />
-      <Route path="/account" component={Account} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/subscribe" component={Subscribe} />
-      <Route path="/checkout" component={Checkout} />
-      <Route path="/payment-success" component={PaymentSuccess} />
-      <Route path="/subscription-success" component={SubscriptionSuccess} />
-      <Route path="/demo-access" component={DemoAccess} />
-      <Route path="/demo-full" component={DemoFull} />
-      <Route path="/demo-complete" component={DemoComplete} />
-      <Route path="/demo-interface" component={DemoInterface} />
-      <Route path="/demo-invite" component={DemoInvite} />
-      <Route path="/test-beat-delay-sessions" component={TestBeatDelaySessions} />
-      <Route path="/:rest*" component={NotFound} />
-    </Router>
+    <>
+      <Router>
+        <Route path="/" component={Home} />
+        <Route path="/strategia/percentage" component={StrategyPercentage} />
+        <Route path="/strategia/dalembert" component={StrategyDalembert} />
+        <Route path="/strategia/masaniello" component={StrategyMasaniello} />
+        <Route path="/strategia/kelly" component={StrategyKelly} />
+        <Route path="/strategia/beat-delay" component={StrategyBeatDelay} />
+        <Route path="/strategia/profitfall" component={StrategyProfitfall} />
+        <Route path="/account" component={Account} />
+        <Route path="/pricing" component={Pricing} />
+        <Route path="/subscribe" component={Subscribe} />
+        <Route path="/checkout" component={Checkout} />
+        <Route path="/payment-success" component={PaymentSuccess} />
+        <Route path="/subscription-success" component={SubscriptionSuccess} />
+        <Route path="/demo-access" component={DemoAccess} />
+        <Route path="/demo-full" component={DemoFull} />
+        <Route path="/demo-complete" component={DemoComplete} />
+        <Route path="/demo-interface" component={DemoInterface} />
+        <Route path="/demo-invite" component={DemoInvite} />
+        <Route path="/test-beat-delay-sessions" component={TestBeatDelaySessions} />
+        <Route path="/:rest*" component={NotFound} />
+      </Router>
+      
+      {/* Sync Status Component - Always visible */}
+      <SyncStatus />
+    </>
   );
 }
 
