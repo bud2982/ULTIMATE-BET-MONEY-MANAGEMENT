@@ -34,6 +34,6 @@ export default defineConfig(({ mode }) => {
       },
     },
   },
-  base: "./", // Use relative paths for assets
+  base: "/", // Use absolute paths for assets
   };
 });

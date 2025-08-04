@@ -3,9 +3,15 @@ services:
     name: ultimate-bet-money-management
     env: node
     plan: free
-    buildCommand: npm ci --include=dev && npm run build && echo "Build completed" && ls -la dist/ && ls -la dist/public/ && echo "Files in dist/public/assets:" && ls -la dist/public/assets/ || echo "Build failed"
+    buildCommand: npm ci --include=dev --legacy-peer-deps && npm run build
     startCommand: node server.render.js
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 10000
     healthCheckPath: /health
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
