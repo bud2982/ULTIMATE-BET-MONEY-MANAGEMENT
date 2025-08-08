@@ -52,13 +52,17 @@ export default function StrategyProfitFall() {
   }, [betting.nextStake, betting.currentSession]);
   
   // Se non c'è una sessione corrente e arrivano dati dalle sessioni, controlla se ce n'è una di tipo profitfall
-  // MA SOLO se non abbiamo appena fatto un reset
   useEffect(() => {
     if (!betting.currentSession && Array.isArray(betting.sessions) && betting.sessions.length > 0) {
-      const profitfallSession = betting.sessions.find(s => s.strategy === 'profitfall');
-      if (profitfallSession && profitfallSession.betCount > 0) {
-        // Imposta la sessione solo se ha delle scommesse (non è stata resettata)
-        betting.setCurrentSession(profitfallSession);
+      // Trova l'ultima sessione profitfall (la più recente)
+      const profitfallSessions = betting.sessions.filter(s => s.strategy === 'profitfall');
+      if (profitfallSessions.length > 0) {
+        // Ordina per data di creazione (più recente prima) e prendi la prima
+        const latestSession = profitfallSessions.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0];
+        console.log("🔄 Caricando sessione Profit Fall esistente:", latestSession.name);
+        betting.setCurrentSession(latestSession);
       }
     }
   }, [betting.sessions, betting.currentSession]);
@@ -251,14 +255,18 @@ export default function StrategyProfitFall() {
     };
     
     // Inizia una nuova sessione con tutti i campi richiesti
-    betting.startNewSession({
+    const sessionData = {
       name: sessionName.trim(),
       initialBankroll: validInitialBankroll,
       currentBankroll: validInitialBankroll,
       targetReturn: validTargetReturn,
-      strategy: 'profitfall',
+      strategy: 'profitfall' as const,
       strategySettings: JSON.stringify(strategySettings)
-    });
+    };
+    
+    console.log("🚀 Creando sessione Profit Fall:", sessionData);
+    
+    betting.startNewSession(sessionData);
     
     toast({
       title: "Sessione iniziata",
