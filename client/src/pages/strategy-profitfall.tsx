@@ -1009,14 +1009,16 @@ export default function StrategyProfitFall() {
                       return (
                         <div 
                           key={session.id} 
-                          className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition"
-                          onClick={() => betting.setCurrentSession(session)}
+                          className="p-4 border rounded-lg hover:bg-gray-50 transition"
                         >
-                          <div className="flex justify-between items-start">
+                          <div className="flex justify-between items-start mb-3">
                             <div>
                               <p className="font-medium">{session.name}</p>
                               <p className="text-sm text-gray-500">
                                 Scommesse: {session.betCount} (V: {session.wins} | P: {session.losses})
+                              </p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Creata: {new Date(session.createdAt).toLocaleDateString('it-IT')}
                               </p>
                             </div>
                             <div 
@@ -1028,6 +1030,53 @@ export default function StrategyProfitFall() {
                             >
                               {roi.toFixed(2)}%
                             </div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs flex-1"
+                              onClick={() => {
+                                betting.setCurrentSession(session);
+                                
+                                // Carica i parametri della sessione nei form
+                                const settings = JSON.parse(session.strategySettings);
+                                setSessionName(session.name);
+                                setInitialBankroll(session.initialBankroll);
+                                setStakeIniziale(settings.stakeIniziale || 10);
+                                setMargineProfitto(settings.margineProfitto || 10);
+                                setProfitFallStopLoss(settings.profitFallStopLoss || 100);
+                                setTargetReturn(session.targetReturn);
+                                setFattoreRecupero((settings.fattoreRecupero || 0.65) * 100);
+                                setAumentoMassimoStep(settings.aumentoMassimoStep || 15);
+                                setCapMassimoAssoluto(settings.capMassimoAssoluto || 100);
+                                setUsaQuotaReale(settings.usaQuotaReale !== false);
+                                setQuotaRiferimento(settings.quotaRiferimento || 2.0);
+                                
+                                toast({
+                                  title: "Sessione caricata",
+                                  description: `Sessione "${session.name}" caricata con successo`,
+                                });
+                              }}
+                            >
+                              Carica
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                              onClick={() => {
+                                if (window.confirm(`Sei sicuro di voler eliminare la sessione "${session.name}"?`)) {
+                                  betting.deleteSession(session.id!);
+                                  toast({
+                                    title: "Sessione eliminata",
+                                    description: `Sessione "${session.name}" eliminata con successo`,
+                                  });
+                                }
+                              }}
+                            >
+                              Elimina
+                            </Button>
                           </div>
                         </div>
                       );

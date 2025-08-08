@@ -706,6 +706,105 @@ export default function StrategyMasaniello() {
               </CardContent>
             </Card>
 
+            {/* Sessioni Salvate */}
+            {Array.isArray(betting.sessions) && betting.sessions.filter((session: any) => session.strategy === 'masaniello').length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium">Sessioni Masaniello Salvate</h3>
+                    <div className="text-sm text-gray-500">
+                      {betting.sessions.filter((session: any) => session.strategy === 'masaniello').length} sessioni trovate
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {betting.sessions
+                      .filter((session: any) => session.strategy === 'masaniello')
+                      .map((session: any) => (
+                        <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900">{session.name}</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
+                              <div>
+                                <span className="font-medium">Bankroll:</span> {formatCurrency(session.currentBankroll)}
+                              </div>
+                              <div>
+                                <span className="font-medium">Scommesse:</span> {session.betCount}
+                              </div>
+                              <div>
+                                <span className="font-medium">Win Rate:</span> {
+                                  session.betCount > 0 
+                                    ? `${((session.wins / session.betCount) * 100).toFixed(1)}%`
+                                    : '0%'
+                                }
+                              </div>
+                              <div>
+                                <span className="font-medium">ROI:</span> 
+                                <span className={`ml-1 ${
+                                  session.currentBankroll >= session.initialBankroll 
+                                    ? 'text-green-600' 
+                                    : 'text-red-600'
+                                }`}>
+                                  {(((session.currentBankroll - session.initialBankroll) / session.initialBankroll) * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              Creata: {new Date(session.createdAt).toLocaleDateString('it-IT')}
+                            </div>
+                          </div>
+                          <div className="flex space-x-2 ml-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs"
+                              onClick={() => {
+                                betting.setCurrentSession(session);
+                                
+                                // Carica i parametri della sessione nei form
+                                const settings = JSON.parse(session.strategySettings);
+                                setSessionName(session.name);
+                                setInitialBankroll(session.initialBankroll);
+                                setTotalEvents(settings.totalEvents || 5);
+                                setMinimumWins(settings.minimumWins || 3);
+                                setRiskFactor(settings.riskFactor || 1.5);
+                                setTargetReturn(session.targetReturn);
+                                if (settings.eventOdds) {
+                                  setEventOdds(settings.eventOdds);
+                                }
+                                
+                                toast({
+                                  title: "Sessione caricata",
+                                  description: `Sessione "${session.name}" caricata con successo`,
+                                });
+                              }}
+                            >
+                              Carica
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                              onClick={() => {
+                                if (window.confirm(`Sei sicuro di voler eliminare la sessione "${session.name}"?`)) {
+                                  betting.deleteSession(session.id!);
+                                  toast({
+                                    title: "Sessione eliminata",
+                                    description: `Sessione "${session.name}" eliminata con successo`,
+                                  });
+                                }
+                              }}
+                            >
+                              Elimina
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Badges and Session Screenshot */}
             {betting.currentSession && (
               <>
