@@ -51,21 +51,8 @@ export default function StrategyProfitFall() {
     }
   }, [betting.nextStake, betting.currentSession]);
   
-  // Se non c'è una sessione corrente e arrivano dati dalle sessioni, controlla se ce n'è una di tipo profitfall
-  useEffect(() => {
-    if (!betting.currentSession && Array.isArray(betting.sessions) && betting.sessions.length > 0) {
-      // Trova l'ultima sessione profitfall (la più recente)
-      const profitfallSessions = betting.sessions.filter(s => s.strategy === 'profitfall');
-      if (profitfallSessions.length > 0) {
-        // Ordina per data di creazione (più recente prima) e prendi la prima
-        const latestSession = profitfallSessions.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )[0];
-        console.log("🔄 Caricando sessione Profit Fall esistente:", latestSession.name);
-        betting.setCurrentSession(latestSession);
-      }
-    }
-  }, [betting.sessions, betting.currentSession]);
+  // Nota: Rimosso caricamento automatico delle sessioni per evitare conflitti
+  // Le sessioni vengono ora caricate solo manualmente tramite i pulsanti
   
   // Imposta valori iniziali quando c'è una sessione corrente
   useEffect(() => {
@@ -931,6 +918,131 @@ export default function StrategyProfitFall() {
               </CardContent>
             </Card>
           )}
+
+          {/* Pulsanti Gestione Sessioni */}
+          <Card>
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold mb-4">🎮 Gestione Sessioni</h3>
+              
+              {betting.currentSession && betting.currentSession.strategy === 'profitfall' ? (
+                <div className="space-y-3">
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm font-medium text-green-800">✅ Sessione Attiva</p>
+                    <p className="text-sm text-green-700">{betting.currentSession.name}</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                      onClick={() => {
+                        // Forza il salvataggio della sessione corrente
+                        if (betting.currentSession) {
+                          toast({
+                            title: "Sessione salvata",
+                            description: `Sessione "${betting.currentSession.name}" salvata con successo`,
+                          });
+                        }
+                      }}
+                    >
+                      💾 Salva Sessione
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                      onClick={() => {
+                        if (window.confirm("Sei sicuro di voler resettare la sessione corrente?")) {
+                          betting.resetSession();
+                          toast({
+                            title: "Sessione resettata",
+                            description: "La sessione è stata resettata",
+                          });
+                        }
+                      }}
+                    >
+                      🔄 Reset Sessione
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-sm font-medium text-gray-600">ℹ️ Nessuna sessione attiva</p>
+                    <p className="text-sm text-gray-500">Crea una nuova sessione o carica una esistente</p>
+                  </div>
+                  
+                  {Array.isArray(betting.sessions) && betting.sessions.filter(s => s.strategy === 'profitfall').length > 0 && (
+                    <div>
+                      <Label className="text-sm font-medium mb-2 block">Carica Sessione Esistente:</Label>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {betting.sessions
+                          .filter(s => s.strategy === 'profitfall')
+                          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                          .map((session) => (
+                            <div key={session.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{session.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  {formatCurrency(session.currentBankroll)} • {session.betCount} scommesse
+                                </p>
+                              </div>
+                              <div className="flex space-x-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs px-2 py-1"
+                                  onClick={() => {
+                                    betting.setCurrentSession(session);
+                                    
+                                    // Carica i parametri della sessione nei form
+                                    const settings = JSON.parse(session.strategySettings);
+                                    setSessionName(session.name);
+                                    setInitialBankroll(session.initialBankroll);
+                                    setStakeIniziale(settings.stakeIniziale || 10);
+                                    setMargineProfitto(settings.margineProfitto || 10);
+                                    setProfitFallStopLoss(settings.profitFallStopLoss || 100);
+                                    setTargetReturn(session.targetReturn);
+                                    setFattoreRecupero((settings.fattoreRecupero || 0.65) * 100);
+                                    setAumentoMassimoStep(settings.aumentoMassimoStep || 15);
+                                    setCapMassimoAssoluto(settings.capMassimoAssoluto || 100);
+                                    setUsaQuotaReale(settings.usaQuotaReale !== false);
+                                    setQuotaRiferimento(settings.quotaRiferimento || 2.0);
+                                    
+                                    toast({
+                                      title: "Sessione caricata",
+                                      description: `Sessione "${session.name}" caricata con successo`,
+                                    });
+                                  }}
+                                >
+                                  📂 Carica
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                                  onClick={() => {
+                                    if (window.confirm(`Sei sicuro di voler eliminare la sessione "${session.name}"?`)) {
+                                      betting.deleteSession(session.id!);
+                                      toast({
+                                        title: "Sessione eliminata",
+                                        description: `Sessione "${session.name}" eliminata con successo`,
+                                      });
+                                    }
+                                  }}
+                                >
+                                  🗑️ Elimina
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
         
         <div className="space-y-6">
