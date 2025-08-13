@@ -22,10 +22,10 @@ function generateInviteCode(): string {
   return result;
 }
 
-// In-memory storage for trial users and invite codes
-const trialUsers = new Map();
-const inviteCodes = new Map();
-const demoInvites = new Map();
+// Persistent storage is now handled by the storage layer
+// const trialUsers = new Map(); // REMOVED - now using database
+// const inviteCodes = new Map(); // REMOVED - now using database
+const demoInvites = new Map(); // Keep for demo purposes
 
 // Subscription middleware - verifica che l'utente abbia un abbonamento attivo
 const subscriptionMiddleware = (req: any, res: any, next: any) => {
@@ -60,10 +60,13 @@ const mockAuthMiddleware = (req: any, res: any, next: any) => {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint
   app.get('/api/health', (req, res) => {
+    const storageType = process.env.DATABASE_URL?.startsWith('postgres') ? 'postgresql' : 
+                       process.env.DATABASE_URL?.startsWith('file:') ? 'sqlite' : 'memory';
     res.json({ 
       status: 'ok', 
       timestamp: new Date().toISOString(),
-      storage: process.env.DATABASE_URL?.startsWith('postgres') ? 'database' : 'memory'
+      storage: storageType,
+      database_path: process.env.DATABASE_URL
     });
   });
 
@@ -79,46 +82,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: 'Email required' });
     }
 
-    // Check if email already has trial
-    if (trialUsers.has(email)) {
-      return res.status(400).json({ message: 'Email già utilizzata per trial' });
-    }
-
-    // Validate invite code if provided
-    let inviteValid = true;
-    if (inviteCode) {
-      const invite = inviteCodes.get(inviteCode);
-      if (!invite || !invite.active || invite.uses >= invite.maxUses || new Date() > new Date(invite.expiresAt)) {
-        inviteValid = false;
-      } else {
-        // Increment usage
-        invite.uses++;
-        inviteCodes.set(inviteCode, invite);
+    try {
+      // Check if email already has trial
+      const existingTrial = await storage.getTrialUser(email);
+      if (existingTrial) {
+        return res.status(400).json({ message: 'Email già utilizzata per trial' });
       }
-    }
 
-    // Create trial user (5 days)
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 5);
-    
-    const trialUser = {
-      email,
-      startedAt: new Date(),
-      expiresAt,
-      inviteCode: inviteCode || null,
-      inviteValid,
-      status: 'active'
-    };
-    
-    trialUsers.set(email, trialUser);
-    
-    res.json({
-      message: 'Trial attivato con successo',
-      expiresAt,
-      trialDays: 5,
-      inviteUsed: !!inviteCode,
-      inviteValid
-    });
+      // Validate invite code if provided
+      let inviteValid = true;
+      if (inviteCode) {
+        const invite = await storage.getInviteCode(inviteCode);
+        if (!invite || invite.usedAt) {
+          inviteValid = false;
+        } else {
+          // Mark invite code as used
+          await storage.useInviteCode(inviteCode, email);
+        }
+      }
+
+      // Create trial user (5 days or 30 if invite valid)
+      const trialDurationMs = inviteCode && inviteValid ? 
+        30 * 24 * 60 * 60 * 1000 : // 30 days for invite codes
+        5 * 24 * 60 * 60 * 1000;   // 5 days for regular trial
+
+      const trialUser = await storage.createTrialUser(email, '', trialDurationMs);
+      const expiresAt = new Date(trialUser.trialEnd);
+      
+      res.json({
+        message: 'Trial attivato con successo',
+        expiresAt,
+        trialDays: inviteCode && inviteValid ? 30 : 5,
+        inviteUsed: !!inviteCode,
+        inviteValid
+      });
+    } catch (error) {
+      console.error('Error starting trial:', error);
+      res.status(500).json({ message: 'Errore interno del server' });
+    }
   });
 
   // Auth routes - removed duplicate, using trialAuthMiddleware below
@@ -171,6 +172,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     return mockAuthMiddleware(req, res, next);
   };
+
+  // Sessions API Endpoints
+  
+  // Get all sessions
+  app.get('/api/sessions', mockAuthMiddleware, async (req: any, res) => {
+    try {
+      const strategy = req.query.strategy as string;
+      const sessions = await storage.getAllSessions(strategy);
+      res.json(sessions);
+    } catch (error) {
+      console.error('Error getting sessions:', error);
+      res.status(500).json({ error: 'Failed to retrieve sessions' });
+    }
+  });
+
+  // Create new session
+  app.post('/api/sessions', mockAuthMiddleware, async (req: any, res) => {
+    try {
+      const sessionData = {
+        userId: req.user?.id,
+        ...req.body
+      };
+      
+      const session = await storage.createSession(sessionData);
+      res.status(201).json(session);
+    } catch (error) {
+      console.error('Error creating session:', error);
+      res.status(500).json({ error: 'Failed to create session' });
+    }
+  });
+
+  // Get specific session
+  app.get('/api/sessions/:id', mockAuthMiddleware, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const session = await storage.getSession(sessionId);
+      
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      res.json(session);
+    } catch (error) {
+      console.error('Error getting session:', error);
+      res.status(500).json({ error: 'Failed to retrieve session' });
+    }
+  });
+
+  // Update session
+  app.put('/api/sessions/:id', mockAuthMiddleware, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const updatedSession = await storage.updateSession(sessionId, req.body);
+      
+      if (!updatedSession) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      res.json(updatedSession);
+    } catch (error) {
+      console.error('Error updating session:', error);
+      res.status(500).json({ error: 'Failed to update session' });
+    }
+  });
+
+  // Delete session
+  app.delete('/api/sessions/:id', mockAuthMiddleware, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const deleted = await storage.deleteSession(sessionId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      res.status(500).json({ error: 'Failed to delete session' });
+    }
+  });
+
+  // Get bets for a session
+  app.get('/api/sessions/:id/bets', mockAuthMiddleware, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const bets = await storage.getBetsBySessionId(sessionId);
+      res.json(bets);
+    } catch (error) {
+      console.error('Error getting bets:', error);
+      res.status(500).json({ error: 'Failed to retrieve bets' });
+    }
+  });
+
+  // Add bet to session
+  app.post('/api/sessions/:id/bets', mockAuthMiddleware, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      
+      // Create the bet
+      const betData = {
+        sessionId,
+        ...req.body
+      };
+      
+      const bet = await storage.createBet(betData);
+      
+      // Update session statistics
+      const updatedSession = await storage.updateSessionAfterBet(sessionId, bet);
+      
+      res.status(201).json({
+        bet,
+        session: updatedSession
+      });
+    } catch (error) {
+      console.error('Error adding bet:', error);
+      res.status(500).json({ error: 'Failed to add bet' });
+    }
+  });
 
   // Authentication routes with device tracking
   app.get('/api/auth/user', trialAuthMiddleware, async (req: any, res) => {
