@@ -4,12 +4,14 @@ services:
     env: node
     plan: free
     buildCommand: npm ci --include=dev --legacy-peer-deps && npm run build
-    startCommand: node server.render.js
+    startCommand: node start-production.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: DATABASE_URL
+        value: file:/data/app.db
     healthCheckPath: /health
     disk:
       name: data
