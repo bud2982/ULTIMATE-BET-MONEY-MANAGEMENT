@@ -15,7 +15,7 @@ import SparklineChart from "@/components/sparkline-chart";
 import AnimatedProgressTracker from "@/components/animated-progress-tracker";
 import BadgesDisplay from "@/components/badges-display";
 import SessionScreenshot from "@/components/session-screenshot";
-import { AlertCircle, Home, Save, FolderOpen, Trash2 } from "lucide-react";
+import { AlertCircle, Home, Save, FolderOpen, Trash2, PlusCircle } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function StrategyProfitFall() {
@@ -468,6 +468,10 @@ export default function StrategyProfitFall() {
               }}
             >
               <Trash2 className="w-4 h-4 mr-2" /> Reset
+            </Button>
+            <Button onClick={() => setConfirmingReset(false)} variant="outline" className="flex items-center gap-2">
+              <PlusCircle size={16} />
+              Crea nuova sessione
             </Button>
             <Button onClick={() => navigate('/')} variant="outline" className="flex items-center gap-2">
               <Home size={16} />
@@ -1003,11 +1007,24 @@ export default function StrategyProfitFall() {
                       variant="outline"
                       className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
                       onClick={() => {
-                        // Forza il salvataggio della sessione corrente
-                        if (betting.currentSession) {
+                        // Salva uno snapshot della sessione corrente
+                        if (!betting.currentSession) return;
+                        const s = {
+                          name: betting.currentSession.name,
+                          initialBankroll: betting.currentSession.initialBankroll,
+                          currentBankroll: betting.currentSession.currentBankroll,
+                          targetReturn: betting.currentSession.targetReturn,
+                          strategy: betting.currentSession.strategy,
+                          betCount: betting.currentSession.betCount,
+                          wins: betting.currentSession.wins,
+                          losses: betting.currentSession.losses,
+                          strategySettings: betting.currentSession.strategySettings,
+                        };
+                        if (betting.saveSnapshot) {
+                          betting.saveSnapshot(s as any);
                           toast({
                             title: "Sessione salvata",
-                            description: `Sessione "${betting.currentSession.name}" salvata con successo`,
+                            description: `Snapshot della sessione "${betting.currentSession.name}" salvato nello storico.`,
                           });
                         }
                       }}
@@ -1019,16 +1036,16 @@ export default function StrategyProfitFall() {
                       variant="outline"
                       className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
                       onClick={() => {
-                        if (window.confirm("Sei sicuro di voler resettare la sessione corrente?")) {
+                        if (window.confirm("Sei sicuro di voler cancellare definitivamente la sessione corrente?")) {
                           betting.resetSession();
                           toast({
-                            title: "Sessione resettata",
-                            description: "La sessione è stata resettata",
+                            title: "Sessione cancellata",
+                            description: "La sessione è stata rimossa dalla memoria",
                           });
                         }
                       }}
                     >
-                      🔄 Reset Sessione
+                      🗑️ Cancella Sessione
                     </Button>
                   </div>
                 </div>

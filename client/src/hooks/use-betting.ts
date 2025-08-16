@@ -578,39 +578,46 @@ export function useBetting() {
   // Reset the current session (returns a Promise for proper awaiting)
   function resetSession(): Promise<void> {
     if (!currentSession) return Promise.resolve();
-    
+
     const id = currentSession.id!;
     const strategy = currentSession.strategy;
     console.log("Avvio reset della sessione:", id);
-    
-    // Elimina scommesse, poi la sessione, poi resetta lo stato
+
+    // Prova a eliminare su server, altrimenti fallback locale senza errori
     return apiRequest('DELETE', `/api/sessions/${id}/bets`)
-      .then(() => {
-        console.log("✅ Scommesse eliminate con successo");
-        return apiRequest('DELETE', `/api/sessions/${id}`);
+      .catch((error) => {
+        console.warn('Impossibile eliminare le scommesse dal server, eseguo fallback locale:', error);
+        // Pulisce la cache locale delle scommesse per la sessione
+        try {
+          saveToLocalStorage(`${STORAGE_KEYS.BETS_CACHE}_${id}`, []);
+        } catch {}
       })
       .then(() => {
-        console.log("✅ Sessione eliminata completamente");
-        
-        // Reset dello stato di betting dopo aver cancellato tutto
+        return apiRequest('DELETE', `/api/sessions/${id}`)
+          .catch((error) => {
+            console.warn('Impossibile eliminare la sessione dal server, eseguo rimozione locale:', error);
+            // Rimuove la sessione dalla cache locale
+            try {
+              const cachedSessions = loadFromLocalStorage(STORAGE_KEYS.SESSIONS_CACHE) || [];
+              const filtered = cachedSessions.filter((s: any) => s.id !== id);
+              saveToLocalStorage(STORAGE_KEYS.SESSIONS_CACHE, filtered);
+            } catch {}
+          });
+      })
+      .then(() => {
+        // Reset stato locale indipendentemente dall'esito remoto
         resetBettingState(strategy);
         setCurrentSession(null);
         setBettingState({});
-        
-        // Invalidiamo manualmente le query per forzare un aggiornamento
+
+        // Invalida query per forzare aggiornamento UI
         queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
         queryClient.invalidateQueries({ queryKey: [`/api/sessions/${id}/bets`] });
         queryClient.invalidateQueries({ queryKey: ['typed-sessions'] });
         queryClient.invalidateQueries({ queryKey: ['typed-bets'] });
-        
-        // Forziamo l'aggiornamento delle query
+
         setForceRefresh(Date.now());
-        
-        console.log("✅ Reset completato - ora puoi modificare i parametri");
-      })
-      .catch((error) => {
-        console.error("Errore durante il reset della sessione:", error);
-        throw error;
+        console.log('✅ Reset completato (server o locale) - ora puoi modificare i parametri');
       });
   }
 
