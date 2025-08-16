@@ -575,33 +575,31 @@ export function useBetting() {
     addBetMutation.mutate({ sessionId: currentSession.id!, bet: newBet });
   }
 
-  // Reset the current session
-  function resetSession() {
-    if (!currentSession) return;
+  // Reset the current session (returns a Promise for proper awaiting)
+  function resetSession(): Promise<void> {
+    if (!currentSession) return Promise.resolve();
     
-    console.log("Avvio reset della sessione:", currentSession.id);
+    const id = currentSession.id!;
+    const strategy = currentSession.strategy;
+    console.log("Avvio reset della sessione:", id);
     
-    // Prima eliminiamo tutte le scommesse dal server
-    apiRequest('DELETE', `/api/sessions/${currentSession.id}/bets`)
+    // Elimina scommesse, poi la sessione, poi resetta lo stato
+    return apiRequest('DELETE', `/api/sessions/${id}/bets`)
       .then(() => {
         console.log("✅ Scommesse eliminate con successo");
-        
-        // Poi eliminiamo completamente la sessione dal database
-        return apiRequest('DELETE', `/api/sessions/${currentSession.id}`);
+        return apiRequest('DELETE', `/api/sessions/${id}`);
       })
       .then(() => {
         console.log("✅ Sessione eliminata completamente");
         
         // Reset dello stato di betting dopo aver cancellato tutto
-        resetBettingState(currentSession.strategy);
-        
-        // IMPORTANTE: Resettiamo completamente la sessione corrente per permettere la modifica dei parametri
+        resetBettingState(strategy);
         setCurrentSession(null);
         setBettingState({});
         
         // Invalidiamo manualmente le query per forzare un aggiornamento
-        queryClient.invalidateQueries({ queryKey: ['sessions'] });
-        queryClient.invalidateQueries({ queryKey: [`/api/sessions/${currentSession.id}/bets`] });
+        queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+        queryClient.invalidateQueries({ queryKey: [`/api/sessions/${id}/bets`] });
         queryClient.invalidateQueries({ queryKey: ['typed-sessions'] });
         queryClient.invalidateQueries({ queryKey: ['typed-bets'] });
         
@@ -612,6 +610,7 @@ export function useBetting() {
       })
       .catch((error) => {
         console.error("Errore durante il reset della sessione:", error);
+        throw error;
       });
   }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,7 @@ import SparklineChart from "@/components/sparkline-chart";
 import AnimatedProgressTracker from "@/components/animated-progress-tracker";
 import BadgesDisplay from "@/components/badges-display";
 import SessionScreenshot from "@/components/session-screenshot";
-import { AlertCircle, Home } from "lucide-react";
+import { AlertCircle, Home, Save, FolderOpen, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function StrategyProfitFall() {
@@ -403,10 +404,76 @@ export default function StrategyProfitFall() {
             />
           </div>
           
-          <Button onClick={() => navigate('/')} variant="outline" className="flex items-center gap-2">
-            <Home size={16} />
-            Torna alla Home
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Toolbar Salva/Carica/Cancella per Profit Fall */}
+            <Button
+              variant="outline"
+              className="text-sm"
+              onClick={() => {
+                if (!betting.currentSession) return;
+                const s = {
+                  name: betting.currentSession.name,
+                  initialBankroll: betting.currentSession.initialBankroll,
+                  currentBankroll: betting.currentSession.currentBankroll,
+                  targetReturn: betting.currentSession.targetReturn,
+                  strategy: betting.currentSession.strategy,
+                  betCount: betting.currentSession.betCount,
+                  wins: betting.currentSession.wins,
+                  losses: betting.currentSession.losses,
+                  strategySettings: betting.currentSession.strategySettings,
+                };
+                if (betting.saveSnapshot) {
+                  betting.saveSnapshot(s as any);
+                  toast({ title: 'Sessione salvata', description: 'Snapshot salvato nello storico.' });
+                }
+              }}
+            >
+              <Save className="w-4 h-4 mr-2" /> Salva
+            </Button>
+            <Button
+              variant="outline"
+              className="text-sm"
+              onClick={() => {
+                // Carica l'ultima sessione PROFIT FALL disponibile
+                const sessions = (betting.sessions || []).filter((x: any) => x.strategy === 'profitfall');
+                if (sessions.length === 0) {
+                  toast({ title: 'Nessuna sessione da caricare' });
+                  return;
+                }
+                // Ordina per data più recente
+                sessions.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                const s = sessions[0];
+                betting.setCurrentSession(s);
+                toast({ title: 'Sessione caricata', description: s.name });
+              }}
+            >
+              <FolderOpen className="w-4 h-4 mr-2" /> Carica
+            </Button>
+            <Button
+              variant="destructive"
+              className="text-sm"
+              onClick={async () => {
+                if (!betting.currentSession?.id) {
+                  toast({ title: 'Nessuna sessione attiva' });
+                  return;
+                }
+                if (window.confirm('Sei sicuro di voler resettare la sessione corrente?')) {
+                  try {
+                    await betting.resetSession();
+                    toast({ title: 'Sessione resettata' });
+                  } catch (e) {
+                    toast({ title: 'Errore reset', variant: 'destructive' });
+                  }
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Reset
+            </Button>
+            <Button onClick={() => navigate('/')} variant="outline" className="flex items-center gap-2">
+              <Home size={16} />
+              Torna alla Home
+            </Button>
+          </div>
         </div>
         
         <p className="mt-2 text-gray-600">
