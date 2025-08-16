@@ -457,19 +457,22 @@ export default function StrategyProfitFall() {
                   toast({ title: 'Nessuna sessione attiva' });
                   return;
                 }
-                if (window.confirm('Sei sicuro di voler resettare la sessione corrente?')) {
+                if (window.confirm('Sei sicuro di voler cancellare definitivamente la sessione corrente?')) {
                   try {
                     await betting.resetSession();
-                    toast({ title: 'Sessione resettata' });
+                    toast({ title: 'Sessione cancellata' });
                   } catch (e) {
-                    toast({ title: 'Errore reset', variant: 'destructive' });
+                    toast({ title: 'Errore cancellazione', variant: 'destructive' });
                   }
                 }
               }}
             >
-              <Trash2 className="w-4 h-4 mr-2" /> Reset
+              <Trash2 className="w-4 h-4 mr-2" /> Cancella
             </Button>
-            <Button onClick={() => setConfirmingReset(false)} variant="outline" className="flex items-center gap-2">
+            <Button onClick={() => {
+              // Passa alla creazione di una nuova sessione senza cancellare quella corrente
+              betting.setCurrentSession(null);
+            }} variant="outline" className="flex items-center gap-2">
               <PlusCircle size={16} />
               Crea nuova sessione
             </Button>
