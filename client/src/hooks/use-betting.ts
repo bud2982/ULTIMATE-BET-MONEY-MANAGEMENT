@@ -138,6 +138,32 @@ export function useBetting() {
     }
   });
 
+  // Save snapshot of current session without switching
+  const saveSnapshotMutation = useMutation({
+    mutationFn: async (snapshot: SessionData) => {
+      try {
+        const res = await apiRequest('POST', '/api/sessions', snapshot);
+        return await res.json();
+      } catch (error) {
+        console.warn('Failed to save snapshot on server, saving locally:', error);
+        const localSession = {
+          ...snapshot,
+          id: Date.now(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        const cachedSessions = loadFromLocalStorage(STORAGE_KEYS.SESSIONS_CACHE) || [];
+        cachedSessions.unshift(localSession);
+        saveToLocalStorage(STORAGE_KEYS.SESSIONS_CACHE, cachedSessions);
+        return localSession;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      refetchSessions();
+    }
+  });
+
   // Update session
   const updateSessionMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: Partial<SessionData> }) => {
@@ -619,6 +645,7 @@ export function useBetting() {
     startNewSession,
     placeBet,
     resetSession,
+    saveSnapshot: (s: SessionData) => saveSnapshotMutation.mutate(s),
     deleteSession: (id: number) => deleteSessionMutation.mutate(id),
     updateSession: ({ id, data }: { id: number; data: Partial<SessionData> }) => updateSessionMutation.mutate({ id, data })
   };

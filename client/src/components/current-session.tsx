@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BetData } from '@/types/betting';
+import { BetData, SessionData } from '@/types/betting';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,11 +14,18 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog';
+import {
   Alert,
   AlertTitle,
   AlertDescription
 } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Save, FolderOpen, Trash2 } from 'lucide-react';
 import { 
   getStrategyDisplayName, 
   formatCurrency 
@@ -30,6 +37,7 @@ interface CurrentSessionProps {
 }
 
 export default function CurrentSession({ betting }: CurrentSessionProps) {
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
   const { toast } = useToast();
   const [confirmingReset, setConfirmingReset] = useState(false);
   
@@ -146,11 +154,75 @@ export default function CurrentSession({ betting }: CurrentSessionProps) {
       <CardContent className="p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-montserrat font-semibold text-primary">Sessione Corrente</h2>
-          <Badge variant="outline" className="text-sm font-medium bg-gray-100 px-3 py-1">
-            Strategia: <span className="text-primary ml-1">
-              {getStrategyDisplayName(betting.currentSession.strategy)}
-            </span>
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="text-sm"
+              onClick={() => {
+                // Salva la sessione corrente come nuova sessione nello storico
+                if (!betting.currentSession) return;
+                const s: SessionData = {
+                  name: betting.currentSession.name || `Sessione ${new Date().toLocaleString()}`,
+                  initialBankroll: betting.currentSession.initialBankroll,
+                  currentBankroll: betting.currentSession.currentBankroll,
+                  targetReturn: betting.currentSession.targetReturn,
+                  strategy: betting.currentSession.strategy,
+                  betCount: betting.currentSession.betCount ?? 0,
+                  wins: betting.currentSession.wins ?? 0,
+                  losses: betting.currentSession.losses ?? 0,
+                  strategySettings: betting.currentSession.strategySettings || JSON.stringify({})
+                };
+                // Usa l'endpoint esistente di creazione sessione
+                // Qui richiamiamo l'API via hook: crea e imposta come corrente
+                try {
+                  // Proviamo via API esistenti del betting hook
+                  if (betting.saveSnapshot) {
+                    betting.saveSnapshot(s);
+                  } else if (betting.startNewSession) {
+                    // fallback: salva avviando una nuova sessione (cambia sessione corrente)
+                    betting.startNewSession(s);
+                  } else {
+                    toast({ title: 'Impossibile salvare', description: 'Nessuna funzione di salvataggio disponibile', variant: 'destructive' });
+                    return;
+                  }
+                  toast({ title: 'Sessione salvata', description: 'La sessione corrente è stata salvata nello storico.' });
+                } catch (e) {
+                  console.error(e);
+                  toast({ title: 'Errore salvataggio', description: 'Non è stato possibile salvare la sessione.', variant: 'destructive' });
+                }
+              }}
+            >
+              <Save className="w-4 h-4 mr-2" /> Salva
+            </Button>
+            <Button
+              variant="outline"
+              className="text-sm"
+              onClick={() => setShowLoadDialog(true)}
+            >
+              <FolderOpen className="w-4 h-4 mr-2" /> Carica
+            </Button>
+            <Button
+              variant="destructive"
+              className="text-sm"
+              onClick={() => {
+                if (!betting.currentSession?.id) {
+                  toast({ title: 'Nessuna sessione da cancellare', variant: 'destructive' });
+                  return;
+                }
+                if (confirm('Eliminare la sessione corrente?')) {
+                  betting.deleteSession?.(betting.currentSession.id);
+                  toast({ title: 'Sessione eliminata' });
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Cancella
+            </Button>
+            <Badge variant="outline" className="text-sm font-medium bg-gray-100 px-3 py-1">
+              Strategia: <span className="text-primary ml-1">
+                {getStrategyDisplayName(betting.currentSession.strategy)}
+              </span>
+            </Badge>
+          </div>
         </div>
 
         {/* Riepilogo Cassa */}
@@ -325,6 +397,52 @@ export default function CurrentSession({ betting }: CurrentSessionProps) {
             </Button>
           </div>
         </div>
+        {/* Dialog Carica Sessione */}
+        <Dialog open={showLoadDialog} onOpenChange={setShowLoadDialog}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Carica una sessione</DialogTitle>
+            </DialogHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Strategia</TableHead>
+                    <TableHead>Cassa</TableHead>
+                    <TableHead>Azioni</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {betting.sessions && betting.sessions.length > 0 ? (
+                    betting.sessions.map((s: SessionData) => (
+                      <TableRow key={s.id || s.name}>
+                        <TableCell>{s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '-'}</TableCell>
+                        <TableCell>{s.name}</TableCell>
+                        <TableCell>{getStrategyDisplayName(s.strategy)}</TableCell>
+                        <TableCell>{formatCurrency(s.currentBankroll)}</TableCell>
+                        <TableCell>
+                          <Button size="sm" onClick={() => {
+                            betting.setCurrentSession?.(s);
+                            setShowLoadDialog(false);
+                            toast({ title: 'Sessione caricata', description: s.name });
+                          }}>Carica</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4">
+                        Nessuna sessione disponibile.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
