@@ -508,7 +508,48 @@ export default function StrategyKelly() {
                 <p className="text-gray-600">Criterio Kelly per eventi simultanei con riduzione del rischio</p>
               </div>
             </div>
-            {betting.currentSession && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="text-sm"
+                onClick={() => {
+                  if (!betting.currentSession) return;
+                  const s = {
+                    name: betting.currentSession.name,
+                    initialBankroll: betting.currentSession.initialBankroll,
+                    currentBankroll: betting.currentSession.currentBankroll,
+                    targetReturn: betting.currentSession.targetReturn,
+                    strategy: betting.currentSession.strategy,
+                    betCount: betting.currentSession.betCount,
+                    wins: betting.currentSession.wins,
+                    losses: betting.currentSession.losses,
+                    strategySettings: betting.currentSession.strategySettings,
+                  };
+                  betting.saveSnapshot(s as any);
+                  toast({ title: 'Sessione salvata', description: 'Snapshot salvato nello storico.' });
+                }}
+              >
+                <Save className="w-4 h-4 mr-2" /> Salva
+              </Button>
+
+              <Button
+                variant="outline"
+                className="text-sm"
+                onClick={() => {
+                  const sessions = (betting.sessions || []).filter((x: any) => x.strategy === 'kelly');
+                  if (sessions.length === 0) {
+                    toast({ title: 'Nessuna sessione da caricare' });
+                    return;
+                  }
+                  sessions.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                  const s = sessions[0];
+                  betting.setCurrentSession(s);
+                  toast({ title: 'Sessione caricata', description: s.name });
+                }}
+              >
+                <FolderOpen className="w-4 h-4 mr-2" /> Carica
+              </Button>
+
               <Button
                 variant={confirmingReset ? "destructive" : "outline"}
                 onClick={handleReset}
@@ -516,7 +557,17 @@ export default function StrategyKelly() {
               >
                 {confirmingReset ? "Conferma Cancella" : "Cancella"}
               </Button>
-            )}
+
+              <Button onClick={() => { betting.setCurrentSession(null); }} variant="outline" className="flex items-center gap-2">
+                <PlusCircle size={16} />
+                Crea nuova sessione
+              </Button>
+
+              <Button onClick={() => navigate('/')} variant="outline" className="flex items-center gap-2">
+                <Home size={16} />
+                Torna alla Home
+              </Button>
+            </div>
           </div>
         </div>
       </header>
