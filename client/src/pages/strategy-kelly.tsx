@@ -14,7 +14,7 @@ import SparklineChart from "@/components/sparkline-chart";
 import AnimatedProgressTracker from "@/components/animated-progress-tracker";
 import BadgesDisplay from "@/components/badges-display";
 import SessionScreenshot from "@/components/session-screenshot";
-import { AlertCircle, CheckCircle, XCircle, Plus, Trash2, Calculator, BarChart3, TrendingUp, Loader2, HelpCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, XCircle, PlusCircle, Save, FolderOpen, Trash2, Calculator, BarChart3, TrendingUp, Loader2, HelpCircle, Home } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -514,7 +514,7 @@ export default function StrategyKelly() {
                 onClick={handleReset}
                 className={`${confirmingReset ? 'animate-pulse' : ''}`}
               >
-                {confirmingReset ? "Conferma Reset" : "Reset"}
+                {confirmingReset ? "Conferma Cancella" : "Cancella"}
               </Button>
             )}
           </div>

@@ -14,6 +14,7 @@ import SparklineChart from "@/components/sparkline-chart";
 import AnimatedProgressTracker from "@/components/animated-progress-tracker";
 import BadgesDisplay from "@/components/badges-display";
 import SessionScreenshot from "@/components/session-screenshot";
+import { Save, FolderOpen, Trash2, PlusCircle, Home } from "lucide-react";
 
 export default function StrategyPercentage() {
   const [, navigate] = useLocation();
@@ -134,13 +135,79 @@ export default function StrategyPercentage() {
     <div className="max-w-7xl mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Strategia Percentuale</h1>
-        <Button
-          onClick={() => navigate('/')}
-          variant="outline"
-          className="bg-gray-100 hover:bg-gray-200"
-        >
-          Torna alla Home
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="text-sm"
+            onClick={() => {
+              if (!betting.currentSession) return;
+              const s = {
+                name: betting.currentSession.name,
+                initialBankroll: betting.currentSession.initialBankroll,
+                currentBankroll: betting.currentSession.currentBankroll,
+                targetReturn: betting.currentSession.targetReturn,
+                strategy: betting.currentSession.strategy,
+                betCount: betting.currentSession.betCount,
+                wins: betting.currentSession.wins,
+                losses: betting.currentSession.losses,
+                strategySettings: betting.currentSession.strategySettings,
+              };
+              betting.saveSnapshot(s as any);
+              toast({ title: 'Sessione salvata', description: 'Snapshot salvato nello storico.' });
+            }}
+          >
+            <Save className="w-4 h-4 mr-2" /> Salva
+          </Button>
+
+          <Button
+            variant="outline"
+            className="text-sm"
+            onClick={() => {
+              const sessions = (betting.sessions || []).filter((x: any) => x.strategy === 'percentage');
+              if (sessions.length === 0) {
+                toast({ title: 'Nessuna sessione da caricare' });
+                return;
+              }
+              sessions.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              const s = sessions[0];
+              betting.setCurrentSession(s);
+              toast({ title: 'Sessione caricata', description: s.name });
+            }}
+          >
+            <FolderOpen className="w-4 h-4 mr-2" /> Carica
+          </Button>
+
+          <Button
+            variant="destructive"
+            className="text-sm"
+            onClick={async () => {
+              if (!betting.currentSession?.id) {
+                toast({ title: 'Nessuna sessione attiva' });
+                return;
+              }
+              if (window.confirm('Sei sicuro di voler cancellare definitivamente la sessione corrente?')) {
+                try {
+                  await betting.resetSession();
+                  toast({ title: 'Sessione cancellata' });
+                } catch (e) {
+                  toast({ title: 'Errore cancellazione', variant: 'destructive' });
+                }
+              }
+            }}
+          >
+            <Trash2 className="w-4 h-4 mr-2" /> Cancella
+          </Button>
+
+          <Button onClick={() => { betting.setCurrentSession(null); }} variant="outline" className="flex items-center gap-2">
+            <PlusCircle size={16} />
+            Crea nuova sessione
+          </Button>
+
+          <Button onClick={() => navigate('/')} variant="outline" className="flex items-center gap-2">
+            <Home size={16} />
+            Torna alla Home
+          </Button>
+        </div>
       </div>
       
       {!betting.currentSession ? (
