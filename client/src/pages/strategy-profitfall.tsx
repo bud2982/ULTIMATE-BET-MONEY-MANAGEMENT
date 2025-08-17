@@ -393,21 +393,9 @@ export default function StrategyProfitFall() {
               className="text-sm"
               onClick={() => {
                 if (!betting.currentSession) return;
-                const s = {
-                  name: betting.currentSession.name,
-                  initialBankroll: betting.currentSession.initialBankroll,
-                  currentBankroll: betting.currentSession.currentBankroll,
-                  targetReturn: betting.currentSession.targetReturn,
-                  strategy: betting.currentSession.strategy,
-                  betCount: betting.currentSession.betCount,
-                  wins: betting.currentSession.wins,
-                  losses: betting.currentSession.losses,
-                  strategySettings: betting.currentSession.strategySettings,
-                };
-                if (betting.saveSnapshot) {
-                  betting.saveSnapshot(s as any);
-                  toast({ title: 'Sessione salvata', description: 'Snapshot salvato nello storico.' });
-                }
+                const ok = betting.saveCurrentSessionSnapshot();
+                if (ok) toast({ title: 'Sessione salvata', description: 'Snapshot salvato nello storico.' });
+                else toast({ title: 'Errore salvataggio', variant: 'destructive' });
               }}
             >
               <Save className="w-4 h-4 mr-2" /> Salva
@@ -416,17 +404,13 @@ export default function StrategyProfitFall() {
               variant="outline"
               className="text-sm"
               onClick={() => {
-                // Carica l'ultima sessione PROFIT FALL disponibile
-                const sessions = (betting.sessions || []).filter((x: any) => x.strategy === 'profitfall');
-                if (sessions.length === 0) {
+                const ok = betting.loadLatestSession('profitfall');
+                if (!ok) {
                   toast({ title: 'Nessuna sessione da caricare' });
-                  return;
+                } else {
+                  const s = betting.currentSession;
+                  toast({ title: 'Sessione caricata', description: s?.name });
                 }
-                // Ordina per data più recente
-                sessions.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-                const s = sessions[0];
-                betting.setCurrentSession(s);
-                toast({ title: 'Sessione caricata', description: s.name });
               }}
             >
               <FolderOpen className="w-4 h-4 mr-2" /> Carica

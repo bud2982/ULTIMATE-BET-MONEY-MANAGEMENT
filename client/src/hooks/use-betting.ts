@@ -621,6 +621,39 @@ export function useBetting() {
       });
   }
 
+  // Helpers centralizzati per snapshot e caricamento
+  function saveCurrentSessionSnapshot(): boolean {
+    if (!currentSession) return false;
+    try {
+      const { id, createdAt, updatedAt, ...rest } = currentSession as any;
+      const snapshot: SessionData = {
+        ...(rest as SessionData),
+        // id omesso per forzare creazione nuova entry
+        strategySettings: currentSession.strategySettings,
+        betCount: currentSession.betCount ?? 0,
+        wins: currentSession.wins ?? 0,
+        losses: currentSession.losses ?? 0,
+      } as SessionData;
+      saveSnapshotMutation.mutate(snapshot);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function loadLatestSession(strategy: BettingStrategy): boolean {
+    try {
+      const list = (sessions || []).filter((s: any) => s?.strategy === strategy);
+      if (!list || list.length === 0) return false;
+      list.sort((a: any, b: any) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime());
+      const s = list[0];
+      setCurrentSession(s);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   return {
     // State
     sessions,
@@ -653,6 +686,10 @@ export function useBetting() {
     resetSession,
     saveSnapshot: (s: SessionData) => saveSnapshotMutation.mutate(s),
     deleteSession: (id: number) => deleteSessionMutation.mutate(id),
-    updateSession: ({ id, data }: { id: number; data: Partial<SessionData> }) => updateSessionMutation.mutate({ id, data })
+    updateSession: ({ id, data }: { id: number; data: Partial<SessionData> }) => updateSessionMutation.mutate({ id, data }),
+
+    // Helpers centralizzati
+    saveCurrentSessionSnapshot,
+    loadLatestSession,
   };
 }
