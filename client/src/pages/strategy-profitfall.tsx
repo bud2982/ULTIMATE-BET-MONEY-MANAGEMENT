@@ -283,14 +283,6 @@ export default function StrategyProfitFall() {
   // Gestione del reset della sessione
   const handleResetConfirm = async () => {
     if (confirmingReset) {
-      console.log("🔄 Confermato reset della sessione");
-      
-      toast({
-        title: "Reset in corso...",
-        description: "Attendere mentre la sessione viene resettata.",
-        variant: "default"
-      });
-      
       try {
         await betting.resetSession();
         setConfirmingReset(false);
@@ -313,20 +305,10 @@ export default function StrategyProfitFall() {
         setQuotaRiferimento(2.0);
         setShowAdvancedSettings(false);
         
-        toast({
-          title: "Sessione resettata",
-          description: "Ora puoi modificare tutti i parametri per creare una nuova sessione.",
-          variant: "default",
-          className: "bg-green-100 border-green-400 text-green-800"
-        });
+        toast({ title: "Sessione cancellata" });
       } catch (error) {
-        console.error("Errore durante il reset:", error);
-        
-        toast({
-          title: "Errore durante il reset",
-          description: "Si è verificato un errore durante il reset della sessione. Ricarica la pagina e riprova.",
-          variant: "destructive"
-        });
+        console.error("Errore durante la cancellazione:", error);
+        toast({ title: "Errore cancellazione", variant: "destructive" });
       }
     } else {
       setConfirmingReset(true);
