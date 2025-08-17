@@ -14,7 +14,7 @@ import SparklineChart from "@/components/sparkline-chart";
 import AnimatedProgressTracker from "@/components/animated-progress-tracker";
 import BadgesDisplay from "@/components/badges-display";
 import SessionScreenshot from "@/components/session-screenshot";
-import { ArrowLeft, Play, RotateCcw, TrendingUp, Target, Timer, Zap, AlertTriangle, CheckCircle, XCircle, Trophy, Calculator, BarChart3, Activity, FolderOpen } from "lucide-react";
+import { ArrowLeft, Play, RotateCcw, TrendingUp, Target, Timer, Zap, AlertTriangle, CheckCircle, XCircle, Trophy, Calculator, BarChart3, Activity, FolderOpen, Save, Trash2, PlusCircle, Home } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
@@ -352,23 +352,10 @@ export default function StrategyBeatDelay() {
       try {
         await betting.resetSession();
         setConfirmingReset(false);
-        
-        toast({
-          title: "Reset completato",
-          description: "La sessione è stata resettata. Puoi creare una nuova sessione.",
-          variant: "default"
-        });
-        
-        setTimeout(() => {
-          setConfirmingReset(false);
-        }, 500);
+        toast({ title: "Sessione cancellata" });
       } catch (error) {
-        console.error("Errore durante il reset:", error);
-        toast({
-          title: "Errore",
-          description: "Si è verificato un errore durante il reset della sessione.",
-          variant: "destructive"
-        });
+        console.error("Errore durante la cancellazione:", error);
+        toast({ title: "Errore cancellazione", variant: "destructive" });
       }
     } else {
       setConfirmingReset(true);
@@ -525,6 +512,82 @@ export default function StrategyBeatDelay() {
                   {getStrategyDisplayName('beat-delay')}
                 </h1>
                 <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+              </div>
+              <div className="flex items-center gap-2 ml-4">
+                <Button
+                  variant="outline"
+                  className="text-sm"
+                  onClick={() => {
+                    if (!betting.currentSession) return;
+                    const s = {
+                      name: betting.currentSession.name,
+                      initialBankroll: betting.currentSession.initialBankroll,
+                      currentBankroll: betting.currentSession.currentBankroll,
+                      targetReturn: betting.currentSession.targetReturn,
+                      strategy: betting.currentSession.strategy,
+                      betCount: betting.currentSession.betCount,
+                      wins: betting.currentSession.wins,
+                      losses: betting.currentSession.losses,
+                      strategySettings: betting.currentSession.strategySettings,
+                    };
+                    betting.saveSnapshot(s as any);
+                    toast({ title: 'Sessione salvata', description: 'Snapshot salvato nello storico.' });
+                  }}
+                >
+                  <Save className="w-4 h-4 mr-2" /> Salva
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="text-sm"
+                  onClick={() => {
+                    const sessions = (betting.sessions || []).filter((x: any) => x.strategy === 'beat-delay');
+                    if (sessions.length === 0) {
+                      toast({ title: 'Nessuna sessione da caricare' });
+                      return;
+                    }
+                    sessions.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                    const s = sessions[0];
+                    betting.setCurrentSession(s);
+                    toast({ title: 'Sessione caricata', description: s.name });
+                  }}
+                >
+                  <FolderOpen className="w-4 h-4 mr-2" /> Carica
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  className="text-sm"
+                  onClick={async () => {
+                    if (!betting.currentSession?.id) {
+                      toast({ title: 'Nessuna sessione attiva' });
+                      return;
+                    }
+                    if (window.confirm('Sei sicuro di voler cancellare definitivamente la sessione corrente?')) {
+                      try {
+                        await betting.resetSession();
+                        toast({ title: 'Sessione cancellata' });
+                      } catch (e) {
+                        toast({ title: 'Errore cancellazione', variant: 'destructive' });
+                      }
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Cancella
+                </Button>
+
+                <Button onClick={() => { betting.setCurrentSession(null); }} variant="outline" className="flex items-center gap-2">
+                  <PlusCircle size={16} />
+                  Crea nuova sessione
+                </Button>
+
+                <Button onClick={() => navigate('/')} variant="outline" className="flex items-center gap-2">
+                  <Home size={16} />
+                  Torna alla Home
+                </Button>
+              </div>
+              <div className="h-8 w-px bg-gray-300" />
+              <div className="flex items-center space-x-2">
                   Avanzato
                 </Badge>
               </div>
@@ -562,7 +625,7 @@ export default function StrategyBeatDelay() {
                     className={confirmingReset ? "bg-red-600 animate-pulse" : ""}
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
-                    {confirmingReset ? "Conferma Reset" : "Reset"}
+                    {confirmingReset ? "Conferma Cancella" : "Cancella"}
                   </Button>
                 </div>
               </div>
