@@ -512,6 +512,8 @@ export default function StrategyBeatDelay() {
                   {getStrategyDisplayName('beat-delay')}
                 </h1>
                 <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                  Avanzato
+                </Badge>
               </div>
               <div className="flex items-center gap-2 ml-4">
                 <Button
@@ -573,11 +575,6 @@ export default function StrategyBeatDelay() {
                   <Home size={16} />
                   Torna alla Home
                 </Button>
-              </div>
-              <div className="h-8 w-px bg-gray-300" />
-              <div className="flex items-center space-x-2">
-                  Avanzato
-                </Badge>
               </div>
             </div>
             
