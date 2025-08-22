@@ -28,33 +28,60 @@ export default function Home() {
   
   // Usa react-query per ottenere le sessioni tipizzate correttamente
   const { data: sessionsTyped } = useQuery<SessionData[]>({
-    queryKey: ['typed-sessions'],
+    queryKey: ['typed-sessions', betting.sessions?.length, betting.bets?.length],
     queryFn: async () => {
       if (Array.isArray(betting.sessions)) {
+        console.log("Home: Fetching typed sessions", { 
+          sessionsCount: betting.sessions.length,
+          betsCount: betting.bets?.length || 0
+        });
         return betting.sessions as SessionData[];
       }
       return [];
     },
     enabled: !!betting.sessions,
-    staleTime: 1000 // Refresh solo quando cambiano i dati
+    staleTime: 500, // Reduced stale time to refresh more frequently
+    refetchOnWindowFocus: true,
+    refetchOnMount: true
   });
   
   // Costruisci la mappa di tutte le scommesse per sessionId
   useEffect(() => {
     if (sessionsTyped && sessionsTyped.length > 0) {
       const fetchAllBets = async () => {
+        console.log("Home: Fetching all bets for sessions", { sessionsCount: sessionsTyped.length });
         const betsMap: Record<number, any> = {};
         
         for (const session of sessionsTyped) {
           if (session.id) {
             try {
-              const response = await fetch(`/api/sessions/${session.id}/bets`);
-              const sessionBets = await response.json();
-              if (Array.isArray(sessionBets)) {
-                betsMap[session.id] = sessionBets;
+              // Use the betting hook's refetchBets function if available for the current session
+              if (betting.currentSession?.id === session.id && betting.bets && betting.bets.length > 0) {
+                console.log(`Using cached bets for current session ${session.id}`);
+                betsMap[session.id] = betting.bets;
+              } else {
+                // Otherwise fetch from API
+                const response = await fetch(`/api/sessions/${session.id}/bets`);
+                const sessionBets = await response.json();
+                if (Array.isArray(sessionBets)) {
+                  betsMap[session.id] = sessionBets;
+                }
               }
             } catch (error) {
               console.error(`Errore nel recupero delle scommesse per la sessione ${session.id}:`, error);
+              
+              // Try to use cached bets from localStorage as fallback
+              try {
+                const cachedBets = localStorage.getItem(`betting_bets_cache_${session.id}`);
+                if (cachedBets) {
+                  const parsedBets = JSON.parse(cachedBets);
+                  if (Array.isArray(parsedBets)) {
+                    betsMap[session.id] = parsedBets;
+                  }
+                }
+              } catch (e) {
+                console.error("Failed to load from localStorage:", e);
+              }
             }
           }
         }
@@ -63,8 +90,17 @@ export default function Home() {
       };
       
       fetchAllBets();
+      
+      // Set up a refresh interval to update bets periodically
+      const intervalId = setInterval(() => {
+        if (betting.currentSession) {
+          fetchAllBets();
+        }
+      }, 2000); // Refresh every 2 seconds if there's an active session
+      
+      return () => clearInterval(intervalId);
     }
-  }, [sessionsTyped]);
+  }, [sessionsTyped, betting.currentSession?.id, betting.bets]);
   
   // Calcola il bankroll allocato e le strategie attive
   useEffect(() => {

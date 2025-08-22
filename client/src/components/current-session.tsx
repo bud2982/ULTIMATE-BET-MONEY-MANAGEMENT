@@ -51,8 +51,13 @@ export default function CurrentSession({ betting }: CurrentSessionProps) {
     // Esegue l'azione
     betting.placeBet(true);
     
-    // Ripristina la posizione di scroll dopo un breve ritardo
+    // Forza un aggiornamento della tabella
     setTimeout(() => {
+      if (betting.refetchBets) {
+        betting.refetchBets();
+      }
+      
+      // Ripristina la posizione di scroll
       window.scrollTo(0, scrollPosition);
     }, 100);
   };
@@ -67,8 +72,13 @@ export default function CurrentSession({ betting }: CurrentSessionProps) {
     // Esegue l'azione
     betting.placeBet(false);
     
-    // Ripristina la posizione di scroll dopo un breve ritardo
+    // Forza un aggiornamento della tabella
     setTimeout(() => {
+      if (betting.refetchBets) {
+        betting.refetchBets();
+      }
+      
+      // Ripristina la posizione di scroll
       window.scrollTo(0, scrollPosition);
     }, 100);
   };

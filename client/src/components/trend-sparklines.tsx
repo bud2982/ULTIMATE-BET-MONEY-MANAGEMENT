@@ -36,6 +36,12 @@ export default function TrendSparklines({
 
   // Calculate metrics for all sessions
   useEffect(() => {
+    // Add a console log to track when this effect runs
+    console.log("TrendSparklines: Recalculating metrics", { 
+      sessionsCount: sessions.length, 
+      allBetsKeys: Object.keys(allBets).length 
+    });
+    
     const metrics: SessionMetrics[] = sessions
       .filter(session => session.id)
       .map(session => {
@@ -107,6 +113,13 @@ export default function TrendSparklines({
       });
 
     setSessionMetrics(metrics);
+    
+    // Force a re-render after a short delay to ensure the UI updates
+    const timeoutId = setTimeout(() => {
+      setSessionMetrics([...metrics]);
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [sessions, allBets]);
 
   const formatMetricValue = (metrics: SessionMetrics, metric: string) => {

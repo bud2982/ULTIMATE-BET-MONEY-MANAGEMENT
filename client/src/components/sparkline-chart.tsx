@@ -33,6 +33,13 @@ export default function SparklineChart({
   
   // Prepare the data for the chart
   useEffect(() => {
+    // Log when the chart data is being updated
+    console.log("SparklineChart: Updating chart data", { 
+      betsLength: bets.length, 
+      displayBetsLength: displayBets.length,
+      animated
+    });
+    
     if (!animated) {
       setDisplayBets(bets);
       return;
@@ -44,15 +51,34 @@ export default function SparklineChart({
       return;
     }
     
+    // If we have a completely new dataset or more bets than before, reset animation
+    if (bets.length !== displayBets.length && 
+        (displayBets.length === 0 || bets.length < displayBets.length)) {
+      setDisplayBets([]);
+      return;
+    }
+    
     // Animate by gradually adding bets
     if (displayBets.length < bets.length) {
       const timer = setTimeout(() => {
         setDisplayBets(bets.slice(0, displayBets.length + 1));
-      }, 100);
+      }, 50); // Faster animation (50ms instead of 100ms)
       
       return () => clearTimeout(timer);
     }
   }, [bets, displayBets.length, animated]);
+  
+  // Force refresh when bets array changes (even if length is the same)
+  useEffect(() => {
+    // This effect will run when the bets array reference changes
+    // It ensures we update even when just the data inside bets changes
+    if (!animated) {
+      setDisplayBets([...bets]);
+    } else if (bets.length > 0 && displayBets.length === bets.length) {
+      // If we've already animated to the full length, ensure data is up to date
+      setDisplayBets([...bets]);
+    }
+  }, [bets]);
   
   // Don't display anything if there's no data yet
   if (bets.length === 0) {

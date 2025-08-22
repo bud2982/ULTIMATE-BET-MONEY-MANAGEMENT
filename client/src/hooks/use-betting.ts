@@ -98,7 +98,9 @@ export function useBetting() {
       }
     },
     enabled: !!currentSession?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // Reduced to 30 seconds to ensure more frequent updates
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchOnMount: true, // Refetch when component mounts
     retry: 1
   });
 
@@ -239,19 +241,29 @@ export function useBetting() {
     },
     onSuccess: (data) => {
       // Forziamo l'aggiornamento anche quando aggiungiamo scommesse
-      setForceRefresh(Date.now());
+      const newForceRefresh = Date.now();
+      setForceRefresh(newForceRefresh);
       
       // Invalida tutte le query correlate alle sessioni
       queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions', data.session.strategy] });
+      
+      // Importante: aggiorna la query key con il nuovo timestamp
       queryClient.invalidateQueries({ 
-        queryKey: ['/api/sessions', data.session.id, 'bets', forceRefresh] 
+        queryKey: ['/api/sessions', data.session.id, 'bets'] 
       });
       
+      // Aggiorna immediatamente la cache delle scommesse per evitare ritardi nell'UI
+      const currentBets = queryClient.getQueryData(['/api/sessions', data.session.id, 'bets', forceRefresh]) || [];
+      queryClient.setQueryData(['/api/sessions', data.session.id, 'bets', newForceRefresh], [...currentBets, data.bet]);
+      
+      // Aggiorna la sessione corrente
       setCurrentSession(data.session);
       
       // Esplicitamente ricarica le scommesse
-      refetchBets();
+      setTimeout(() => {
+        refetchBets();
+      }, 50);
       
       // Ricarica le sessioni per il filtro per strategia
       refetchSessions();
@@ -316,10 +328,25 @@ export function useBetting() {
     }
   }, [sessions]);
 
-  // Save bets cache to localStorage when they change
+  // Save bets cache to localStorage when they change and force UI update
   useEffect(() => {
     if (bets && currentSession?.id) {
+      // Save to localStorage
       saveToLocalStorage(`${STORAGE_KEYS.BETS_CACHE}_${currentSession.id}`, bets);
+      
+      // Force UI update by updating the session with the latest bet count
+      if (currentSession && Array.isArray(bets) && bets.length > 0) {
+        // Only update if the bet count doesn't match
+        if (currentSession.betCount !== bets.length) {
+          const updatedSession = {
+            ...currentSession,
+            betCount: bets.length,
+            wins: bets.filter(b => b.win).length,
+            losses: bets.filter(b => !b.win).length
+          };
+          setCurrentSession(updatedSession);
+        }
+      }
     }
   }, [bets, currentSession?.id]);
 
@@ -687,6 +714,10 @@ export function useBetting() {
     saveSnapshot: (s: SessionData) => saveSnapshotMutation.mutate(s),
     deleteSession: (id: number) => deleteSessionMutation.mutate(id),
     updateSession: ({ id, data }: { id: number; data: Partial<SessionData> }) => updateSessionMutation.mutate({ id, data }),
+    
+    // Refetch functions
+    refetchBets,
+    refetchSessions,
 
     // Helpers centralizzati
     saveCurrentSessionSnapshot,
