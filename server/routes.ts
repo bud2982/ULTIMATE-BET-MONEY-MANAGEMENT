@@ -292,6 +292,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete all bets for a session
+  app.delete('/api/sessions/:id/bets', mockAuthMiddleware, async (req: any, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      if (isNaN(sessionId)) {
+        return res.status(400).json({ error: 'Invalid session ID' });
+      }
+
+      // Verify that the session exists
+      const session = await storage.getSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+      }
+
+      // Delete all bets for the session
+      await storage.deleteAllBetsForSession(sessionId);
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting bets:', error);
+      res.status(500).json({ error: 'Failed to delete bets' });
+    }
+  });
+
   // Authentication routes with device tracking
   app.get('/api/auth/user', trialAuthMiddleware, async (req: any, res) => {
     const userAgent = req.headers['user-agent'] || 'Unknown Device';
@@ -391,135 +415,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sessions", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
-    try {
-      const validatedData = req.body; // TODO: Add validation
-      const newSession = await storage.createSession(validatedData);
-      res.status(201).json(newSession);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid session data", error });
-    }
-  });
 
-  app.patch("/api/sessions/:id", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid session ID" });
-      }
 
-      const session = await storage.updateSession(id, req.body);
-      if (!session) {
-        return res.status(404).json({ message: "Session not found" });
-      }
 
-      res.json(session);
-    } catch (error) {
-      res.status(400).json({ message: "Failed to update session", error });
-    }
-  });
-
-  app.delete("/api/sessions/:id", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid session ID" });
-      }
-
-      const success = await storage.deleteSession(id);
-      if (!success) {
-        return res.status(404).json({ message: "Session not found" });
-      }
-
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete session" });
-    }
-  });
-
-  // Bets routes (subscription required)
-  app.get("/api/sessions/:sessionId/bets", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
-    try {
-      const sessionId = parseInt(req.params.sessionId);
-      if (isNaN(sessionId)) {
-        return res.status(400).json({ message: "Invalid session ID" });
-      }
-
-      const bets = await storage.getBetsBySessionId(sessionId);
-      res.json(bets);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to get bets" });
-    }
-  });
-
-  app.post("/api/sessions/:sessionId/bets", mockAuthMiddleware, subscriptionMiddleware, async (req, res) => {
-    try {
-      const sessionId = parseInt(req.params.sessionId);
-      if (isNaN(sessionId)) {
-        return res.status(400).json({ message: "Invalid session ID" });
-      }
-
-      const session = await storage.getSession(sessionId);
-      if (!session) {
-        return res.status(404).json({ message: "Session not found" });
-      }
-
-      const betData = { ...req.body, sessionId };
-      const validatedData = betData; // TODO: Add validation
-      
-      const newBet = await storage.createBet(validatedData);
-
-      // Update session with new bankroll and stats
-      const updatedSession = await storage.updateSessionAfterBet(sessionId, newBet);
-      
-      res.status(201).json({ bet: newBet, session: updatedSession });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid bet data", error });
-    }
-  });
-
-  // Delete all bets for a session
-  app.delete("/api/sessions/:sessionId/bets", async (req, res) => {
-    try {
-      const sessionId = parseInt(req.params.sessionId);
-      if (isNaN(sessionId)) {
-        return res.status(400).json({ message: "Invalid session ID" });
-      }
-
-      // Verifica che la sessione esista
-      const session = await storage.getSession(sessionId);
-      if (!session) {
-        return res.status(404).json({ message: "Session not found" });
-      }
-
-      // Elimina tutte le scommesse (anche se non ce ne sono)
-      await storage.deleteAllBetsForSession(sessionId);
-      
-      // Restituisce sempre successo se la sessione esiste
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete bets" });
-    }
-  });
-
-  // Delete a session completely
-  app.delete("/api/sessions/:sessionId", async (req, res) => {
-    try {
-      const sessionId = parseInt(req.params.sessionId);
-      if (isNaN(sessionId)) {
-        return res.status(400).json({ message: "Invalid session ID" });
-      }
-
-      const success = await storage.deleteSession(sessionId);
-      if (!success) {
-        return res.status(404).json({ message: "Session not found" });
-      }
-
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Failed to delete session" });
-    }
-  });
 
   // Payment Routes - Production Ready
   // Create subscription endpoint with Stripe integration

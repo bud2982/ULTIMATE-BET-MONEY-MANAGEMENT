@@ -150,7 +150,24 @@ export async function initializeDatabase() {
       );
     `);
     
+    // Create mock user for development
+    sqlite.exec(`
+      INSERT OR IGNORE INTO "users" (
+        "id", "email", "first_name", "last_name", 
+        "subscription_status", "created_at", "updated_at"
+      ) VALUES (
+        'subscriber-user-123', 
+        'subscriber@example.com', 
+        'Subscriber', 
+        'User', 
+        'active', 
+        strftime('%s', 'now'), 
+        strftime('%s', 'now')
+      );
+    `);
+    
     console.log('✅ Database initialized successfully');
+    console.log('✅ Mock user created for development');
     return true;
   } catch (error) {
     console.error('❌ Error initializing database:', error);
